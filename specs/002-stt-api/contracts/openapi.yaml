@@ -1,0 +1,311 @@
+openapi: 3.1.0
+info:
+  title: STT API - Japanese Speech-to-Text
+  description: |
+    ReazonSpeech NeMo v2 を使用した日本語音声認識API。
+    音声ファイルのアップロードとリアルタイムWebSocketストリーミングをサポート。
+  version: 1.0.0
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/stt/transcribe:
+    post:
+      summary: Transcribe audio file
+      description: |
+        音声ファイルをアップロードして日本語テキストに変換する。
+        対応形式: WAV, MP3, FLAC, OGG
+      operationId: transcribeAudio
+      tags:
+        - STT
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 音声ファイル（最大100MB）
+      responses:
+        "200":
+          description: Transcription successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionResponse"
+              example:
+                text: "こんにちは、今日はいい天気ですね。"
+                duration_seconds: 3.5
+                processing_time_seconds: 1.2
+                segments:
+                  - text: "こんにちは、"
+                    start_time: 0.0
+                    end_time: 1.2
+                  - text: "今日はいい天気ですね。"
+                    start_time: 1.3
+                    end_time: 3.5
+        "400":
+          description: Invalid request (unsupported format or empty audio)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unsupported_format:
+                  summary: Unsupported file format
+                  value:
+                    error_code: "UNSUPPORTED_FORMAT"
+                    message: "File format 'pdf' is not supported"
+                    details:
+                      provided_format: "pdf"
+                      supported_formats: ["wav", "mp3", "flac", "ogg"]
+                empty_audio:
+                  summary: Empty audio file
+                  value:
+                    error_code: "EMPTY_AUDIO"
+                    message: "Audio file is empty or invalid"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: "FILE_TOO_LARGE"
+                message: "File size exceeds maximum limit of 100MB"
+                details:
+                  max_size_mb: 100
+                  provided_size_mb: 150.5
+        "500":
+          description: Internal processing error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: "PROCESSING_ERROR"
+                message: "Failed to process audio file"
+        "503":
+          description: Model not loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: "MODEL_NOT_LOADED"
+                message: "STT model is still loading, please try again later"
+
+  /api/stt/status:
+    get:
+      summary: Get STT service status
+      description: モデルのロード状態とリソース使用状況を取得する。
+      operationId: getSTTStatus
+      tags:
+        - STT
+      responses:
+        "200":
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/STTStatus"
+              example:
+                model_loaded: true
+                model_name: "reazonspeech-nemo-v2"
+                device: "cuda"
+                memory_usage_mb: 2048.5
+
+  /api/stt/stream:
+    get:
+      summary: WebSocket streaming endpoint
+      description: |
+        リアルタイム音声ストリーミング用のWebSocketエンドポイント。
+
+        **接続**: `ws://localhost:8000/api/stt/stream`
+
+        **送信データ**: 16kHz, 16-bit PCM音声チャンク (binary)
+
+        **受信データ**: JSON形式のStreamMessage
+      operationId: streamTranscribe
+      tags:
+        - STT
+        - WebSocket
+      responses:
+        "101":
+          description: WebSocket connection established
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamMessage"
+              examples:
+                partial:
+                  summary: Partial result
+                  value:
+                    type: "partial"
+                    text: "こんにち"
+                    is_final: false
+                    timestamp: 1703548800.123
+                final:
+                  summary: Final result
+                  value:
+                    type: "final"
+                    text: "こんにちは"
+                    is_final: true
+                    timestamp: 1703548801.456
+                error:
+                  summary: Error message
+                  value:
+                    type: "error"
+                    text: "Audio processing failed"
+                    is_final: true
+                    timestamp: 1703548802.789
+
+components:
+  schemas:
+    TranscriptionResponse:
+      type: object
+      required:
+        - text
+        - duration_seconds
+        - processing_time_seconds
+      properties:
+        text:
+          type: string
+          description: 認識されたテキスト全文
+          example: "こんにちは、今日はいい天気ですね。"
+        duration_seconds:
+          type: number
+          format: float
+          minimum: 0
+          description: 音声ファイルの長さ（秒）
+          example: 3.5
+        processing_time_seconds:
+          type: number
+          format: float
+          minimum: 0
+          description: 処理にかかった時間（秒）
+          example: 1.2
+        segments:
+          type: array
+          nullable: true
+          description: タイムスタンプ付きセグメント
+          items:
+            $ref: "#/components/schemas/Segment"
+
+    Segment:
+      type: object
+      required:
+        - text
+        - start_time
+        - end_time
+      properties:
+        text:
+          type: string
+          description: セグメントのテキスト
+          example: "こんにちは、"
+        start_time:
+          type: number
+          format: float
+          minimum: 0
+          description: 開始時間（秒）
+          example: 0.0
+        end_time:
+          type: number
+          format: float
+          description: 終了時間（秒）
+          example: 1.2
+
+    STTStatus:
+      type: object
+      required:
+        - model_loaded
+        - model_name
+        - device
+        - memory_usage_mb
+      properties:
+        model_loaded:
+          type: boolean
+          description: モデルがロード済みかどうか
+          example: true
+        model_name:
+          type: string
+          description: モデル名
+          example: "reazonspeech-nemo-v2"
+        device:
+          type: string
+          enum: ["cuda", "cpu"]
+          description: 実行デバイス
+          example: "cuda"
+        memory_usage_mb:
+          type: number
+          format: float
+          description: 現在のメモリ使用量（MB）
+          example: 2048.5
+
+    StreamMessage:
+      type: object
+      required:
+        - type
+        - text
+        - is_final
+      properties:
+        type:
+          type: string
+          enum: ["partial", "final", "error"]
+          description: メッセージタイプ
+          example: "partial"
+        text:
+          type: string
+          description: 認識テキストまたはエラーメッセージ
+          example: "こんにちは"
+        is_final:
+          type: boolean
+          description: 確定したセグメントかどうか
+          example: false
+        timestamp:
+          type: number
+          format: float
+          nullable: true
+          description: メッセージのタイムスタンプ
+          example: 1703548800.123
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: エラーコード
+          enum:
+            - UNSUPPORTED_FORMAT
+            - FILE_TOO_LARGE
+            - EMPTY_AUDIO
+            - MODEL_NOT_LOADED
+            - PROCESSING_ERROR
+          example: "UNSUPPORTED_FORMAT"
+        message:
+          type: string
+          description: 人間可読なエラーメッセージ
+          example: "File format 'pdf' is not supported"
+        details:
+          type: object
+          nullable: true
+          description: 追加のエラー詳細
+          additionalProperties: true
+
+tags:
+  - name: STT
+    description: Speech-to-Text operations
+  - name: WebSocket
+    description: Real-time streaming endpoints

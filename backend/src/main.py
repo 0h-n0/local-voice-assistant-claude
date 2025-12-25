@@ -1,15 +1,33 @@
 """FastAPI application entry point for Local Voice Assistant Backend."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import __version__
 from src.api.health import router as health_router
+from src.api.stt import router as stt_router
+from src.dependencies import set_stt_service
+from src.services.stt_service import STTService
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan - load model on startup."""
+    stt_service = STTService()
+    set_stt_service(stt_service)
+    await stt_service.load_model()
+    yield
+    # Cleanup on shutdown if needed
+
 
 app = FastAPI(
     title="Local Voice Assistant API",
     description="Backend API for the Local Voice Assistant",
     version=__version__,
+    lifespan=lifespan,
 )
 
 # Configure CORS for development
@@ -25,3 +43,4 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router)
+app.include_router(stt_router)
