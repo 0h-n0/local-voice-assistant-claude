@@ -8,6 +8,11 @@ dependencies = [
     "fastapi>=0.109.0",
     "pydantic>=2.5.0",
     "uvicorn[standard]>=0.27.0",
+    "reazonspeech-nemo-asr @ git+https://github.com/reazon-research/ReazonSpeech.git#subdirectory=pkg/nemo-asr",
+    "pydub>=0.25.0",
+    "soundfile>=0.12.0",
+    "python-multipart>=0.0.6",
+    "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +27,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
@@ -71,3 +79,16 @@ show_error_codes = true
 [[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["pydub.*", "soundfile.*", "reazonspeech.*"]
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.14.10",
+]
