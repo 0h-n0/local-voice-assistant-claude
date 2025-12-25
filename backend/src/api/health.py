@@ -4,12 +4,10 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
+from src import __version__
 from src.models.health import HealthResponse
 
 router = APIRouter()
-
-# Application version
-VERSION = "0.1.0"
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -21,6 +19,6 @@ async def health_check() -> HealthResponse:
     """
     return HealthResponse(
         status="healthy",
-        version=VERSION,
+        version=__version__,
         timestamp=datetime.now(UTC),
     )
