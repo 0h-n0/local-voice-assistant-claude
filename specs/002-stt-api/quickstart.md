@@ -149,4 +149,4 @@ print(f"Model loaded: {status['model_loaded']}")
 - First request may take longer (model initialization)
 - GPU provides ~10x faster processing than CPU
 - RTF (Real-Time Factor) target: < 0.5 (10s audio in 5s)
-- Maximum concurrent requests: 10
+- Maximum concurrent requests: 3

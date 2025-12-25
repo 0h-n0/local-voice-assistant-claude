@@ -1,6 +1,7 @@
 """STT API endpoints for Japanese speech-to-text."""
 
 import logging
+import re
 import time
 
 from fastapi import (
@@ -30,6 +31,16 @@ router = APIRouter(prefix="/api/stt", tags=["stt"])
 MAX_FILE_SIZE_MB = 100
 MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
 
+# Chunk size for streaming file read (1MB)
+CHUNK_SIZE = 1024 * 1024
+
+
+def _sanitize_filename(filename: str) -> str:
+    """Sanitize filename for safe logging (prevent log injection)."""
+    # Remove control characters and limit length
+    sanitized = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", filename)
+    return sanitized[:255] if len(sanitized) > 255 else sanitized
+
 
 @router.post(
     "/transcribe",
@@ -47,7 +58,8 @@ async def transcribe_audio(file: UploadFile) -> TranscriptionResponse:
     Accepts WAV, MP3, FLAC, and OGG formats.
     Maximum file size: 100MB.
     """
-    filename = file.filename or "audio.wav"
+    raw_filename = file.filename or "audio.wav"
+    filename = _sanitize_filename(raw_filename)
     logger.info("Transcription request received: filename=%s", filename)
     request_start = time.time()
 
@@ -64,40 +76,37 @@ async def transcribe_audio(file: UploadFile) -> TranscriptionResponse:
             ).model_dump(),
         )
 
-    # Read file content
-    content = await file.read()
+    # Read file content with size limit check (stream to avoid memory issues)
+    chunks: list[bytes] = []
+    total_size = 0
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_FILE_SIZE:
+            file_size_mb = total_size / (1024 * 1024)
+            logger.warning(
+                "Transcription rejected: file too large (>%.2f MB > %d MB)",
+                file_size_mb,
+                MAX_FILE_SIZE_MB,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=ErrorResponse(
+                    error_code=ErrorCode.FILE_TOO_LARGE,
+                    message=f"File size exceeds maximum limit of {MAX_FILE_SIZE_MB}MB",
+                    details={
+                        "max_size_mb": MAX_FILE_SIZE_MB,
+                        "provided_size_mb": file_size_mb,
+                    },
+                ).model_dump(),
+            )
+        chunks.append(chunk)
 
-    # Check file size
+    content = b"".join(chunks)
     file_size_mb = len(content) / (1024 * 1024)
     logger.debug("File size: %.2f MB", file_size_mb)
-    if len(content) > MAX_FILE_SIZE:
-        logger.warning(
-            "Transcription rejected: file too large (%.2f MB > %d MB)",
-            file_size_mb,
-            MAX_FILE_SIZE_MB,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=ErrorResponse(
-                error_code=ErrorCode.FILE_TOO_LARGE,
-                message=f"File size exceeds maximum limit of {MAX_FILE_SIZE_MB}MB",
-                details={
-                    "max_size_mb": MAX_FILE_SIZE // (1024 * 1024),
-                    "provided_size_mb": file_size_mb,
-                },
-            ).model_dump(),
-        )
-
-    # Validate and check for empty audio
-    if not content:
-        logger.warning("Transcription rejected: empty audio file")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorResponse(
-                error_code=ErrorCode.EMPTY_AUDIO,
-                message="Audio file is empty or invalid",
-            ).model_dump(),
-        )
 
     # Validate format
     is_valid, error_code = stt_service.validate_audio_format(filename, content)

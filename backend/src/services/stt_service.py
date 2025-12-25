@@ -3,10 +3,9 @@
 import asyncio
 import io
 import logging
-import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import soundfile as sf
 from pydub import AudioSegment
@@ -63,7 +62,7 @@ class STTService:
         """Initialize STT service."""
         self._model: Any | None = None
         self._model_name = "reazonspeech-nemo-v2"
-        self._device = "cpu"
+        self._device: Literal["cuda", "cpu"] = "cpu"
         self._semaphore = asyncio.Semaphore(3)  # Max 3 concurrent requests
 
     @property
@@ -221,16 +220,12 @@ class STTService:
         def _transcribe() -> Any:
             from reazonspeech.nemo.asr import audio_from_numpy, transcribe
 
-            # Read WAV data
+            # Read WAV data from bytes
             data, sample_rate = sf.read(io.BytesIO(wav_data))
             audio = audio_from_numpy(data, sample_rate)
             return transcribe(self._model, audio)
 
-        # Write to temp file and transcribe
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as f:
-            f.write(wav_data)
-            f.flush()
-            return await loop.run_in_executor(None, _transcribe)
+        return await loop.run_in_executor(None, _transcribe)
 
     async def transcribe_pcm(self, pcm_data: bytes) -> str:
         """Transcribe raw PCM audio data (16kHz, 16-bit, mono).
@@ -297,6 +292,6 @@ class STTService:
         return STTStatus(
             model_loaded=self.model_loaded,
             model_name=self._model_name,
-            device=self._device,  # type: ignore[arg-type]
+            device=self._device,
             memory_usage_mb=memory_mb,
         )
