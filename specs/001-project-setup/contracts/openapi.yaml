@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Local Voice Assistant API
+  version: 0.1.0
+  description: |
+    Local Voice Assistant Backend API.
+    This is the initial project setup with only health check endpoint.
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Returns the current health status of the service.
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: healthy
+                version: "0.1.0"
+                timestamp: "2025-12-25T10:30:00Z"
+        "503":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: unhealthy
+                version: "0.1.0"
+                timestamp: "2025-12-25T10:30:00Z"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+          description: Current health status of the service
+        version:
+          type: string
+          description: Application version
+          example: "0.1.0"
+        timestamp:
+          type: string
+          format: date-time
+          description: Response generation timestamp in ISO 8601 format
+          example: "2025-12-25T10:30:00Z"
+
+tags:
+  - name: Health
+    description: Health check operations
