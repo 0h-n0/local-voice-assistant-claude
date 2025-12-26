@@ -1,5 +1,6 @@
 """Integration tests for LLM API endpoints."""
 
+import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +9,6 @@ from httpx import ASGITransport, AsyncClient
 from src.dependencies import set_llm_service
 from src.main import app
 from src.models.llm import ErrorCode
-from src.services.llm_service import LLMService
 
 
 @pytest.fixture
@@ -27,8 +27,15 @@ def mock_openai_response():
 @pytest.fixture
 def llm_service_with_mock(mock_openai_response):
     """Create LLM service with mocked OpenAI client."""
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-        service = LLMService()
+    from src.models import config as config_module
+    from src.services import llm_service as llm_module
+
+    config_module.get_settings.cache_clear()
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False):
+        importlib.reload(config_module)
+        importlib.reload(llm_module)
+        service = llm_module.LLMService()
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(
             return_value=mock_openai_response
@@ -37,14 +44,29 @@ def llm_service_with_mock(mock_openai_response):
         set_llm_service(service)
         yield service
 
+    config_module.get_settings.cache_clear()
+    importlib.reload(config_module)
+    importlib.reload(llm_module)
+
 
 @pytest.fixture
 def llm_service_unconfigured():
     """Create LLM service without API key."""
-    with patch.dict("os.environ", {}, clear=True):
-        service = LLMService()
+    from src.models import config as config_module
+    from src.services import llm_service as llm_module
+
+    config_module.get_settings.cache_clear()
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False):
+        importlib.reload(config_module)
+        importlib.reload(llm_module)
+        service = llm_module.LLMService()
         set_llm_service(service)
         yield service
+
+    config_module.get_settings.cache_clear()
+    importlib.reload(config_module)
+    importlib.reload(llm_module)
 
 
 # =============================================================================
