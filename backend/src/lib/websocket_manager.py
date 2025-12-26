@@ -5,9 +5,8 @@ Manages WebSocket connections, session tracking, and message broadcasting.
 
 import asyncio
 import contextlib
+import logging
 import uuid
-from collections.abc import Callable
-from datetime import datetime
 
 from fastapi import WebSocket
 
@@ -21,6 +20,8 @@ from src.models.websocket import (
     WebSocketErrorCode,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ConnectionManager:
     """Manages WebSocket connections and session lifecycle."""
@@ -30,9 +31,7 @@ class ConnectionManager:
         # Active connections: session_id -> websocket
         self._connections: dict[str, WebSocket] = {}
         # Ping task handles for cleanup
-        self._ping_tasks: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
-        # Message handlers registered by session
-        self._handlers: dict[str, list[Callable]] = {}  # type: ignore[type-arg]
+        self._ping_tasks: dict[str, asyncio.Task[None]] = {}
 
     @property
     def active_connections(self) -> int:
@@ -56,11 +55,8 @@ class ConnectionManager:
         session_id = str(uuid.uuid4())
         self._connections[session_id] = websocket
 
-        # Send connection acknowledgement
-        ack = ConnectionAckMessage(
-            session_id=session_id,
-            server_time=datetime.utcnow(),
-        )
+        # Send connection acknowledgement (server_time uses default_factory)
+        ack = ConnectionAckMessage(session_id=session_id)
         await self.send_message(session_id, ack)
 
         return session_id
@@ -81,10 +77,6 @@ class ConnectionManager:
         # Remove connection
         if session_id in self._connections:
             del self._connections[session_id]
-
-        # Remove handlers
-        if session_id in self._handlers:
-            del self._handlers[session_id]
 
     def get_websocket(self, session_id: str) -> WebSocket | None:
         """Get the WebSocket for a session.
@@ -115,7 +107,9 @@ class ConnectionManager:
             await websocket.send_json(message.model_dump(mode="json"))
             return True
         except Exception:
-            # Connection likely closed
+            logger.warning(
+                "Failed to send message to session %s, disconnecting", session_id
+            )
             await self.disconnect(session_id)
             return False
 

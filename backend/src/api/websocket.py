@@ -13,7 +13,13 @@ from pydantic import ValidationError
 from src.config import WS_HEARTBEAT_INTERVAL
 from src.lib.websocket_manager import connection_manager
 from src.models.websocket import (
+    AudioChunkMessage,
+    AudioEndMessage,
+    CancelMessage,
+    ClientMessage,
+    PongMessage,
     ProcessingStatus,
+    TextInputMessage,
     WebSocketErrorCode,
     parse_client_message,
 )
@@ -90,7 +96,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 async def handle_client_message(
     session_id: str,
-    message: object,
+    message: ClientMessage,
 ) -> None:
     """Handle incoming client message.
 
@@ -98,15 +104,6 @@ async def handle_client_message(
         session_id: The session ID.
         message: The parsed client message.
     """
-    # Import message types for type checking
-    from src.models.websocket import (
-        AudioChunkMessage,
-        AudioEndMessage,
-        CancelMessage,
-        PongMessage,
-        TextInputMessage,
-    )
-
     if isinstance(message, AudioChunkMessage):
         await handle_audio_chunk(session_id, message)
     elif isinstance(message, AudioEndMessage):
@@ -124,7 +121,7 @@ async def handle_client_message(
 
 async def handle_audio_chunk(
     session_id: str,
-    message: object,
+    message: AudioChunkMessage,
 ) -> None:
     """Handle audio chunk message.
 
@@ -135,12 +132,13 @@ async def handle_audio_chunk(
         message: The audio chunk message.
     """
     # Placeholder - will be implemented in Phase 3
+    _ = message  # Suppress unused warning until implementation
     logger.debug("Audio chunk received for session %s", session_id)
 
 
 async def handle_audio_end(
     session_id: str,
-    message: object,
+    message: AudioEndMessage,
 ) -> None:
     """Handle audio end message.
 
@@ -151,12 +149,13 @@ async def handle_audio_end(
         message: The audio end message.
     """
     # Placeholder - will be implemented in Phase 3
+    _ = message  # Suppress unused warning until implementation
     logger.debug("Audio end received for session %s", session_id)
 
 
 async def handle_text_input(
     session_id: str,
-    message: object,
+    message: TextInputMessage,
 ) -> None:
     """Handle text input message.
 
@@ -167,12 +166,13 @@ async def handle_text_input(
         message: The text input message.
     """
     # Placeholder - will be implemented in Phase 5
+    _ = message  # Suppress unused warning until implementation
     logger.debug("Text input received for session %s", session_id)
 
 
 async def handle_cancel(
     session_id: str,
-    message: object,
+    message: CancelMessage,
 ) -> None:
     """Handle cancel message.
 
@@ -183,5 +183,6 @@ async def handle_cancel(
         message: The cancel message.
     """
     # Placeholder - will be implemented in Phase 7
+    _ = message  # Suppress unused warning until implementation
     logger.debug("Cancel received for session %s", session_id)
     await connection_manager.send_status_update(session_id, ProcessingStatus.IDLE)

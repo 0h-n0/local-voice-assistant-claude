@@ -4,11 +4,16 @@ Pydantic models defining the WebSocket message protocol for real-time
 communication between frontend and backend.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(UTC)
 
 # ============================================================================
 # Enums
@@ -75,7 +80,7 @@ class TranscriptPartialMessage(BaseModel):
     type: Literal["transcript_partial"] = "transcript_partial"
     content: str
     confidence: float | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -87,7 +92,7 @@ class TranscriptFinalMessage(BaseModel):
     content: str
     confidence: float = Field(ge=0.0, le=1.0)
     duration_ms: int = Field(ge=0)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -97,7 +102,7 @@ class StatusUpdateMessage(BaseModel):
 
     type: Literal["status_update"] = "status_update"
     status: ProcessingStatus
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -108,7 +113,7 @@ class ResponseChunkMessage(BaseModel):
     type: Literal["response_chunk"] = "response_chunk"
     content: str
     chunk_index: int = Field(ge=0)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -119,7 +124,7 @@ class ResponseCompleteMessage(BaseModel):
     type: Literal["response_complete"] = "response_complete"
     full_text: str
     audio_available: bool
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -132,7 +137,7 @@ class ErrorMessage(BaseModel):
     message: str
     details: dict[str, object] | None = None
     recoverable: bool = False
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -142,7 +147,7 @@ class ConnectionAckMessage(BaseModel):
 
     type: Literal["connection_ack"] = "connection_ack"
     session_id: str
-    server_time: datetime = Field(default_factory=datetime.utcnow)
+    server_time: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
@@ -151,7 +156,7 @@ class PingMessage(BaseModel):
     """Server ping for keepalive."""
 
     type: Literal["ping"] = "ping"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
