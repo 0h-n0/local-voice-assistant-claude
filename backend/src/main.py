@@ -13,6 +13,7 @@ from src.api.llm import router as llm_router
 from src.api.orchestrator import router as orchestrator_router
 from src.api.stt import router as stt_router
 from src.api.tts import router as tts_router
+from src.api.websocket import router as websocket_router
 from src.config import CONVERSATION_DB_PATH
 from src.db.database import DatabaseManager
 from src.dependencies import (
@@ -101,3 +102,4 @@ app.include_router(llm_router)
 app.include_router(tts_router)
 app.include_router(orchestrator_router)
 app.include_router(conversations_router)
+app.include_router(websocket_router)

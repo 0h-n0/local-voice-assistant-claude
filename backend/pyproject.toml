@@ -17,6 +17,7 @@ dependencies = [
     "style-bert-vits2>=2.5.0",
     "scipy>=1.10.0",
     "aiosqlite>=0.22.1",
+    "deepgram-sdk>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -85,7 +86,7 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["pydub.*", "soundfile.*", "reazonspeech.*", "openai.*", "style_bert_vits2.*", "scipy.*", "scipy.io.*"]
+module = ["pydub.*", "soundfile.*", "reazonspeech.*", "openai.*", "style_bert_vits2.*", "scipy.*", "scipy.io.*", "deepgram.*"]
 ignore_missing_imports = true
 
 [dependency-groups]

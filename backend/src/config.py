@@ -45,3 +45,14 @@ ORCHESTRATOR_MIN_AUDIO_DURATION: float = float(
 _BACKEND_DIR = Path(__file__).parent.parent
 _DEFAULT_DB_PATH = str(_BACKEND_DIR / "data" / "conversations.db")
 CONVERSATION_DB_PATH: str = os.getenv("CONVERSATION_DB_PATH", _DEFAULT_DB_PATH)
+
+# WebSocket Configuration
+WS_HEARTBEAT_INTERVAL: int = int(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))  # seconds
+WS_MAX_AUDIO_DURATION: int = int(os.getenv("WS_MAX_AUDIO_DURATION", "60"))  # seconds
+WS_AUDIO_CHUNK_INTERVAL: int = int(os.getenv("WS_AUDIO_CHUNK_INTERVAL", "100"))  # ms
+
+# Deepgram STT Configuration
+DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
+DEEPGRAM_MODEL: str = os.getenv("DEEPGRAM_MODEL", "nova-2")
+DEEPGRAM_LANGUAGE: str = os.getenv("DEEPGRAM_LANGUAGE", "ja")  # Japanese
+DEEPGRAM_SAMPLE_RATE: int = int(os.getenv("DEEPGRAM_SAMPLE_RATE", "16000"))
