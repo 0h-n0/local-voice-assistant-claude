@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChatProvider } from "@/components/providers/ChatContext";
 import { AudioProvider } from "@/components/providers/AudioContext";
+import { WebSocketProvider } from "@/components/providers/WebSocketContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,9 +30,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ChatProvider>
-          <AudioProvider>{children}</AudioProvider>
-        </ChatProvider>
+        <WebSocketProvider>
+          <ChatProvider>
+            <AudioProvider>{children}</AudioProvider>
+          </ChatProvider>
+        </WebSocketProvider>
       </body>
     </html>
   );
