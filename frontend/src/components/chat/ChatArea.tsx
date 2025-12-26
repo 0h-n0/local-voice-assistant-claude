@@ -7,6 +7,7 @@ import { VoiceButton } from "@/components/voice/VoiceButton";
 import { AudioPlayer } from "@/components/voice/AudioPlayer";
 import { InputArea } from "@/components/chat/InputArea";
 import { MuteToggle } from "@/components/voice/MuteToggle";
+import { MicrophoneIcon, LoadingSpinner, CloseIcon } from "@/components/shared/Icons";
 import { sendVoiceMessage, sendTextMessage, synthesizeSpeech } from "@/lib/api";
 
 /**
@@ -23,12 +24,28 @@ export function ChatArea() {
 
   /**
    * Handle completed voice recording.
+   * Note: Voice messages are handled by the orchestrator which returns audio only.
+   * The transcribed text is not available in the response, so we show a placeholder.
    */
   const handleRecordingComplete = useCallback(
     async (audioBlob: Blob) => {
       chatDispatch(chatActions.setSending(true));
       chatDispatch(chatActions.clearError());
       setResponseAudio(null);
+
+      // Generate message IDs
+      const userMessageId = Date.now();
+      const assistantMessageId = userMessageId + 1;
+
+      // Add placeholder user message (voice input)
+      chatDispatch(
+        chatActions.addMessage({
+          id: userMessageId,
+          role: "user",
+          content: "🎤 音声メッセージ",
+          created_at: new Date().toISOString(),
+        })
+      );
 
       try {
         // Send to orchestrator
@@ -37,15 +54,19 @@ export function ChatArea() {
           chatState.currentConversationId ?? undefined
         );
 
+        // Add assistant message placeholder (audio response)
+        chatDispatch(
+          chatActions.addMessage({
+            id: assistantMessageId,
+            role: "assistant",
+            content: "🔊 音声応答",
+            created_at: new Date().toISOString(),
+          })
+        );
+
         // Play the response audio
         setResponseAudio(response.audio);
-
-        // Create a temporary message ID for tracking
-        const tempMessageId = Date.now();
-        setLastMessageId(tempMessageId);
-
-        // Note: In full implementation, we would fetch the updated conversation
-        // from the backend to get the actual messages with proper IDs
+        setLastMessageId(assistantMessageId);
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -68,6 +89,20 @@ export function ChatArea() {
       chatDispatch(chatActions.clearError());
       setResponseAudio(null);
 
+      // Generate message IDs
+      const userMessageId = Date.now();
+      const assistantMessageId = userMessageId + 1;
+
+      // Add user message immediately
+      chatDispatch(
+        chatActions.addMessage({
+          id: userMessageId,
+          role: "user",
+          content: text,
+          created_at: new Date().toISOString(),
+        })
+      );
+
       try {
         // Send text to LLM
         const response = await sendTextMessage(
@@ -75,15 +110,27 @@ export function ChatArea() {
           chatState.currentConversationId ?? undefined
         );
 
-        // Synthesize speech for the response
-        if (response.response && !audioState.isMuted) {
-          const audioResponse = await synthesizeSpeech(response.response);
-          setResponseAudio(audioResponse.audio);
-          setLastMessageId(Date.now());
+        // Add assistant message
+        chatDispatch(
+          chatActions.addMessage({
+            id: assistantMessageId,
+            role: "assistant",
+            content: response.response,
+            created_at: new Date().toISOString(),
+          })
+        );
+
+        // Update conversation ID if this was a new conversation
+        if (!chatState.currentConversationId && response.conversationId) {
+          chatDispatch(chatActions.selectConversation(response.conversationId));
         }
 
-        // Note: In full implementation, we would fetch the updated conversation
-        // from the backend to get the actual messages with proper IDs
+        // Synthesize speech for the response
+        if (response.response && !audioState.isMuted) {
+          const { audio } = await synthesizeSpeech(response.response);
+          setResponseAudio(audio);
+          setLastMessageId(assistantMessageId);
+        }
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -250,69 +297,5 @@ export function ChatArea() {
         </div>
       </div>
     </div>
-  );
-}
-
-// =============================================================================
-// Icons
-// =============================================================================
-
-function MicrophoneIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-      />
-    </svg>
-  );
-}
-
-function LoadingSpinner({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={`animate-spin ${className}`}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 18L18 6M6 6l12 12"
-      />
-    </svg>
   );
 }

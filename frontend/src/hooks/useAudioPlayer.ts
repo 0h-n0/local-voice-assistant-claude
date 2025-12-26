@@ -105,7 +105,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
       try {
         // Request TTS synthesis
-        const audioBlob = await synthesizeSpeech(text, speed);
+        const { audio: audioBlob } = await synthesizeSpeech(text, speed);
 
         // Play the synthesized audio
         await play(audioBlob);

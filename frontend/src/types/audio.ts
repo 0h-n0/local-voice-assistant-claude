@@ -205,3 +205,48 @@ export interface TTSErrorResponse {
   message: string;
   details?: Record<string, unknown>;
 }
+
+// =============================================================================
+// LLM Types
+// =============================================================================
+
+/**
+ * LLM token usage.
+ */
+export interface LLMUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+/**
+ * LLM chat response.
+ */
+export interface LLMResponse {
+  text: string;
+  conversation_id: string;
+  usage: LLMUsage | null;
+  processing_time_seconds: number;
+}
+
+/**
+ * LLM error codes.
+ */
+export type LLMErrorCode =
+  | "EMPTY_MESSAGE"
+  | "MESSAGE_TOO_LONG"
+  | "INVALID_CONVERSATION_ID"
+  | "LLM_NOT_CONFIGURED"
+  | "LLM_RATE_LIMITED"
+  | "LLM_CONNECTION_ERROR"
+  | "LLM_API_ERROR"
+  | "LLM_PROCESSING_ERROR";
+
+/**
+ * LLM error response.
+ */
+export interface LLMErrorResponse {
+  error_code: LLMErrorCode;
+  message: string;
+  details?: Record<string, unknown>;
+}

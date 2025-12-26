@@ -13,10 +13,47 @@ import type {
   ProcessingMetadata,
   OrchestratorErrorResponse,
   TTSErrorResponse,
+  LLMResponse,
+  LLMErrorResponse,
 } from "@/types/audio";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/** Default API request timeout in milliseconds */
+export const API_TIMEOUT = 60000; // 60 seconds
+
+/**
+ * Creates a fetch request with timeout support.
+ * @param url - Request URL
+ * @param options - Fetch options
+ * @param timeout - Timeout in milliseconds (default: API_TIMEOUT)
+ * @returns Promise resolving to Response
+ * @throws Error if request times out or fails
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout = API_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("リクエストがタイムアウトしました");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // =============================================================================
 // Health Endpoint
@@ -127,10 +164,14 @@ export async function sendVoiceMessage(
     formData.append("conversation_id", conversationId);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/orchestrator/dialogue`, {
-    method: "POST",
-    body: formData,
-  });
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/orchestrator/dialogue`,
+    {
+      method: "POST",
+      body: formData,
+    },
+    120000 // 2 minutes for voice dialogue (includes STT + LLM + TTS)
+  );
 
   if (!response.ok) {
     const error = (await response.json()) as OrchestratorErrorResponse;
@@ -156,21 +197,82 @@ export async function sendVoiceMessage(
 export async function synthesizeSpeech(
   text: string,
   speed = 1.0
-): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/tts/synthesize`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+): Promise<{ audio: Blob; duration: number }> {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/tts/synthesize`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text, speed }),
     },
-    body: JSON.stringify({ text, speed }),
-  });
+    30000 // 30 seconds for TTS
+  );
 
   if (!response.ok) {
     const error = (await response.json()) as TTSErrorResponse;
     throw new Error(error.message);
   }
 
-  return response.blob();
+  const audio = await response.blob();
+  const duration = parseFloat(response.headers.get("X-Audio-Duration") || "0");
+
+  return { audio, duration };
+}
+
+// =============================================================================
+// LLM Text Endpoint
+// =============================================================================
+
+/**
+ * Text message response with conversation_id for refreshing.
+ */
+export interface TextMessageResponse {
+  response: string;
+  conversationId: string;
+  processingTime: number;
+}
+
+/**
+ * Sends a text message to the LLM and receives a text response.
+ * @param message - The text message to send
+ * @param conversationId - Optional conversation ID to continue
+ * @returns Promise resolving to text response with conversation metadata
+ */
+export async function sendTextMessage(
+  message: string,
+  conversationId?: string
+): Promise<TextMessageResponse> {
+  // Generate a conversation ID if not provided
+  const convId = conversationId || `conv-${Date.now()}`;
+
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/llm/chat`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message,
+        conversation_id: convId,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = (await response.json()) as LLMErrorResponse;
+    throw new Error(error.message);
+  }
+
+  const data = (await response.json()) as LLMResponse;
+
+  return {
+    response: data.text,
+    conversationId: data.conversation_id,
+    processingTime: data.processing_time_seconds,
+  };
 }
 
 // =============================================================================
@@ -187,7 +289,11 @@ export interface ApiClient {
     conversationId?: string,
     speed?: number
   ): Promise<VoiceDialogueResponse>;
-  synthesizeSpeech(text: string, speed?: number): Promise<Blob>;
+  sendTextMessage(
+    message: string,
+    conversationId?: string
+  ): Promise<TextMessageResponse>;
+  synthesizeSpeech(text: string, speed?: number): Promise<{ audio: Blob; duration: number }>;
 }
 
 /**
@@ -199,5 +305,6 @@ export const apiClient: ApiClient = {
   getConversation,
   deleteConversation,
   sendVoiceMessage,
+  sendTextMessage,
   synthesizeSpeech,
 };
