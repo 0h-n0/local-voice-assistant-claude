@@ -1,25 +1,10 @@
 """Contract tests for TTS API endpoints.
 
-These tests validate the API contract (request/response schemas) matches the OpenAPI spec.
+These tests validate the API contract (request/response schemas)
+matches the OpenAPI spec.
 """
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
-
-@pytest.fixture
-async def tts_client(mock_tts_service):
-    """Create an async test client with mocked TTS service."""
-    from src.dependencies import set_tts_service
-    from src.main import app
-
-    set_tts_service(mock_tts_service)
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
+from httpx import AsyncClient
 
 
 class TestSynthesizeContract:

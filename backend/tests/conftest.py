@@ -1,13 +1,15 @@
 """Pytest configuration and fixtures for backend tests."""
 
-from datetime import datetime, timezone
+import io
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
+from scipy.io import wavfile
 
-from src.dependencies import set_stt_service
+from src.dependencies import set_stt_service, set_tts_service
 from src.services.stt_service import STTService
 
 
@@ -97,10 +99,38 @@ def mock_tts_service():
             model_loaded=True,
             model_name="test-model",
             device="cpu",
-            last_check=datetime.now(timezone.utc),
+            last_check=datetime.now(UTC),
             error_message=None,
         )
 
     service.get_status = get_status
 
+    # Mock audio_to_wav_bytes method
+    def audio_to_wav_bytes(sample_rate: int, audio: np.ndarray) -> bytes:
+        buffer = io.BytesIO()
+        wavfile.write(buffer, sample_rate, audio)
+        return buffer.getvalue()
+
+    service.audio_to_wav_bytes = audio_to_wav_bytes
+
+    # Mock get_audio_length_seconds method
+    def get_audio_length_seconds(sample_rate: int, audio: np.ndarray) -> float:
+        return len(audio) / sample_rate
+
+    service.get_audio_length_seconds = get_audio_length_seconds
+
     return service
+
+
+@pytest.fixture
+async def tts_client(mock_tts_service):
+    """Create an async test client with mocked TTS service."""
+    from src.main import app
+
+    set_tts_service(mock_tts_service)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        yield ac

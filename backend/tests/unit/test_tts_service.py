@@ -3,9 +3,9 @@
 These tests validate the service logic without requiring actual model loading.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+
 import numpy as np
+import pytest
 
 
 class TestTTSServiceValidation:
