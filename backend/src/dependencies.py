@@ -1,6 +1,7 @@
 """Dependency injection for FastAPI."""
 
 from src.services.llm_service import LLMService
+from src.services.orchestrator_service import OrchestratorService
 from src.services.stt_service import STTService
 from src.services.tts_service import TTSService
 
@@ -8,6 +9,7 @@ from src.services.tts_service import TTSService
 _stt_service: STTService | None = None
 _llm_service: LLMService | None = None
 _tts_service: TTSService | None = None
+_orchestrator_service: OrchestratorService | None = None
 
 
 def get_stt_service() -> STTService:
@@ -50,3 +52,17 @@ def set_tts_service(service: TTSService) -> None:
     """Set the TTS service instance."""
     global _tts_service  # noqa: PLW0603
     _tts_service = service
+
+
+def get_orchestrator_service() -> OrchestratorService:
+    """Get the Orchestrator service instance."""
+    if _orchestrator_service is None:
+        msg = "Orchestrator service not initialized"
+        raise RuntimeError(msg)
+    return _orchestrator_service
+
+
+def set_orchestrator_service(service: OrchestratorService) -> None:
+    """Set the Orchestrator service instance."""
+    global _orchestrator_service  # noqa: PLW0603
+    _orchestrator_service = service

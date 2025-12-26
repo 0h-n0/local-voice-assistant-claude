@@ -26,3 +26,16 @@ TTS_MIN_TEXT_LENGTH: int = 1
 TTS_MIN_SPEED: float = 0.5
 TTS_MAX_SPEED: float = 2.0
 TTS_DEFAULT_SPEED: float = 1.0
+
+# Orchestrator Configuration
+ORCHESTRATOR_MAX_CONCURRENT: int = int(os.getenv("ORCHESTRATOR_MAX_CONCURRENT", "5"))
+ORCHESTRATOR_TIMEOUT: float = float(os.getenv("ORCHESTRATOR_TIMEOUT", "30"))  # seconds
+ORCHESTRATOR_SEMAPHORE_TIMEOUT: float = float(
+    os.getenv("ORCHESTRATOR_SEMAPHORE_TIMEOUT", "2.0")
+)  # seconds to wait for semaphore
+ORCHESTRATOR_MAX_AUDIO_DURATION: float = float(
+    os.getenv("ORCHESTRATOR_MAX_AUDIO_DURATION", "300")
+)  # 5 minutes
+ORCHESTRATOR_MIN_AUDIO_DURATION: float = float(
+    os.getenv("ORCHESTRATOR_MIN_AUDIO_DURATION", "0.5")
+)  # 0.5 seconds
