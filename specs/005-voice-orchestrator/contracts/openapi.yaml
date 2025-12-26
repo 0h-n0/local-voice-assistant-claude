@@ -1,0 +1,365 @@
+openapi: 3.0.3
+info:
+  title: Voice Dialogue Orchestrator API
+  description: |
+    STT → LLM → TTS パイプラインを統合し、音声入力から音声応答までを
+    単一のAPIエンドポイントで実現するオーケストレーターAPI。
+  version: 1.0.0
+  contact:
+    name: Local Voice Assistant
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /api/orchestrator/dialogue:
+    post:
+      summary: Execute voice dialogue
+      description: |
+        音声ファイルを受け取り、STT → LLM → TTS パイプラインを実行して
+        音声応答を返却する。
+
+        処理メタデータはHTTPヘッダーに含まれる:
+        - X-Processing-Time-Total: 総処理時間（秒）
+        - X-Processing-Time-STT: STT処理時間（秒）
+        - X-Processing-Time-LLM: LLM処理時間（秒）
+        - X-Processing-Time-TTS: TTS処理時間（秒）
+        - X-Input-Duration: 入力音声長（秒）
+        - X-Input-Text-Length: 認識テキスト文字数
+        - X-Output-Text-Length: 応答テキスト文字数
+        - X-Output-Duration: 出力音声長（秒）
+        - X-Sample-Rate: サンプルレート
+      operationId: executeDialogue
+      tags:
+        - Orchestrator
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: |
+                    音声ファイル（WAV, MP3, M4A, WebM, FLAC, OGG）
+                    最大100MB、0.5秒〜5分
+                speed:
+                  type: number
+                  format: float
+                  minimum: 0.5
+                  maximum: 2.0
+                  default: 1.0
+                  description: TTS話速スケール（0.5=遅い、1.0=標準、2.0=速い）
+      responses:
+        '200':
+          description: 音声応答の生成に成功
+          headers:
+            X-Processing-Time-Total:
+              schema:
+                type: number
+                format: float
+              description: 総処理時間（秒）
+            X-Processing-Time-STT:
+              schema:
+                type: number
+                format: float
+              description: STT処理時間（秒）
+            X-Processing-Time-LLM:
+              schema:
+                type: number
+                format: float
+              description: LLM処理時間（秒）
+            X-Processing-Time-TTS:
+              schema:
+                type: number
+                format: float
+              description: TTS処理時間（秒）
+            X-Input-Duration:
+              schema:
+                type: number
+                format: float
+              description: 入力音声長（秒）
+            X-Input-Text-Length:
+              schema:
+                type: integer
+              description: 認識テキスト文字数
+            X-Output-Text-Length:
+              schema:
+                type: integer
+              description: 応答テキスト文字数
+            X-Output-Duration:
+              schema:
+                type: number
+                format: float
+              description: 出力音声長（秒）
+            X-Sample-Rate:
+              schema:
+                type: integer
+              description: サンプルレート
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorErrorResponse'
+              examples:
+                invalidFormat:
+                  summary: サポートされていない音声形式
+                  value:
+                    error_code: INVALID_AUDIO_FORMAT
+                    message: "Unsupported audio format. Supported: WAV, MP3, M4A, WebM, FLAC, OGG"
+                audioTooShort:
+                  summary: 音声が短すぎる
+                  value:
+                    error_code: AUDIO_TOO_SHORT
+                    message: "Audio duration is too short (minimum 0.5 seconds)"
+                    details:
+                      duration: 0.3
+                      min_duration: 0.5
+                audioTooLong:
+                  summary: 音声が長すぎる
+                  value:
+                    error_code: AUDIO_TOO_LONG
+                    message: "Audio duration exceeds 5 minute limit"
+                    details:
+                      duration: 320.5
+                      max_duration: 300
+        '422':
+          description: 処理失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorErrorResponse'
+              examples:
+                recognitionFailed:
+                  summary: 音声認識失敗
+                  value:
+                    error_code: SPEECH_RECOGNITION_FAILED
+                    message: "Could not recognize speech in the audio"
+        '429':
+          description: リクエスト過多
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorErrorResponse'
+              examples:
+                tooManyRequests:
+                  summary: 同時リクエスト数超過
+                  value:
+                    error_code: TOO_MANY_REQUESTS
+                    message: "Too many concurrent requests"
+                    retry_after: 5
+                llmRateLimited:
+                  summary: LLM APIレート制限
+                  value:
+                    error_code: LLM_RATE_LIMITED
+                    message: "LLM API rate limit exceeded"
+                    retry_after: 60
+        '503':
+          description: サービス利用不可
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorErrorResponse'
+              examples:
+                sttUnavailable:
+                  summary: STTサービス利用不可
+                  value:
+                    error_code: STT_SERVICE_UNAVAILABLE
+                    message: "STT service is not available"
+                llmUnavailable:
+                  summary: LLMサービス利用不可
+                  value:
+                    error_code: LLM_SERVICE_UNAVAILABLE
+                    message: "LLM service is not configured"
+                ttsUnavailable:
+                  summary: TTSサービス利用不可
+                  value:
+                    error_code: TTS_SERVICE_UNAVAILABLE
+                    message: "TTS model is not loaded"
+        '504':
+          description: 処理タイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorErrorResponse'
+              examples:
+                timeout:
+                  summary: 処理タイムアウト
+                  value:
+                    error_code: PROCESSING_TIMEOUT
+                    message: "Processing exceeded 30 second timeout"
+
+  /api/orchestrator/status:
+    get:
+      summary: Get orchestrator status
+      description: |
+        オーケストレーターと各サービス（STT, LLM, TTS）の
+        ヘルスステータスを返却する。
+      operationId: getStatus
+      tags:
+        - Orchestrator
+      responses:
+        '200':
+          description: ステータス取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorStatus'
+              examples:
+                healthy:
+                  summary: 全サービス正常
+                  value:
+                    status: healthy
+                    services:
+                      stt:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                          model_name: reazonspeech-nemo-v2
+                          device: cuda
+                      llm:
+                        status: healthy
+                        details:
+                          api_configured: true
+                          model: gpt-4o-mini
+                      tts:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                          model_name: jvnv-F1-jp
+                          device: cpu
+                    timestamp: "2025-12-26T10:30:00Z"
+                degraded:
+                  summary: 一部サービス劣化
+                  value:
+                    status: degraded
+                    services:
+                      stt:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                      llm:
+                        status: degraded
+                        details:
+                          api_configured: true
+                          last_error: "Rate limit exceeded"
+                      tts:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                    timestamp: "2025-12-26T10:30:00Z"
+                unhealthy:
+                  summary: サービス利用不可
+                  value:
+                    status: unhealthy
+                    services:
+                      stt:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                      llm:
+                        status: unhealthy
+                        details:
+                          api_configured: false
+                          error: "OPENAI_API_KEY not set"
+                      tts:
+                        status: healthy
+                        details:
+                          model_loaded: true
+                    timestamp: "2025-12-26T10:30:00Z"
+
+components:
+  schemas:
+    OrchestratorErrorCode:
+      type: string
+      enum:
+        - INVALID_AUDIO_FORMAT
+        - AUDIO_TOO_SHORT
+        - AUDIO_TOO_LONG
+        - SPEECH_RECOGNITION_FAILED
+        - STT_SERVICE_UNAVAILABLE
+        - LLM_SERVICE_UNAVAILABLE
+        - LLM_RATE_LIMITED
+        - LLM_CONNECTION_ERROR
+        - TTS_SERVICE_UNAVAILABLE
+        - SYNTHESIS_FAILED
+        - PROCESSING_TIMEOUT
+        - TOO_MANY_REQUESTS
+      description: エラーコード
+
+    OrchestratorErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          $ref: '#/components/schemas/OrchestratorErrorCode'
+        message:
+          type: string
+          description: 人間可読エラーメッセージ
+        details:
+          type: object
+          additionalProperties: true
+          description: 追加エラー情報
+        retry_after:
+          type: integer
+          description: リトライまでの秒数（429時）
+
+    HealthStatus:
+      type: string
+      enum:
+        - healthy
+        - degraded
+        - unhealthy
+      description: ヘルスステータス
+
+    ServiceStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        details:
+          type: object
+          additionalProperties: true
+          description: サービス固有の詳細情報
+
+    OrchestratorStatus:
+      type: object
+      required:
+        - status
+        - services
+        - timestamp
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        services:
+          type: object
+          properties:
+            stt:
+              $ref: '#/components/schemas/ServiceStatus'
+            llm:
+              $ref: '#/components/schemas/ServiceStatus'
+            tts:
+              $ref: '#/components/schemas/ServiceStatus'
+        timestamp:
+          type: string
+          format: date-time
+          description: ステータスチェック時刻
+
+tags:
+  - name: Orchestrator
+    description: Voice Dialogue Orchestrator API

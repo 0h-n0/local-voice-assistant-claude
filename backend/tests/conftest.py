@@ -9,7 +9,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from scipy.io import wavfile
 
-from src.dependencies import set_stt_service, set_tts_service
+from src.dependencies import (
+    set_llm_service,
+    set_orchestrator_service,
+    set_stt_service,
+    set_tts_service,
+)
 from src.services.stt_service import STTService
 
 
@@ -128,6 +133,110 @@ async def tts_client(mock_tts_service):
     from src.main import app
 
     set_tts_service(mock_tts_service)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        yield ac
+
+
+@pytest.fixture
+def mock_llm_service():
+    """Create a mock LLM service for testing."""
+    from src.models.llm import LLMStatus, ServiceStatus
+
+    # Use MagicMock for full control
+    service = MagicMock()
+    service._api_key = "test-key"
+    service._model = "gpt-4o-mini"
+    service._max_tokens = 1000
+    service._last_check = None
+    service._last_error = None
+
+    # Mock api_configured property
+    service.api_configured = True
+
+    # Mock generate_response as async
+    async def mock_generate_response(
+        message: str, conversation_id: str
+    ) -> tuple[str, None]:
+        return f"これはテスト応答です。入力: {message}", None
+
+    service.generate_response = mock_generate_response
+
+    # Mock get_status
+    def get_status() -> LLMStatus:
+        return LLMStatus(
+            status=ServiceStatus.HEALTHY,
+            model="gpt-4o-mini",
+            api_configured=True,
+            active_conversations=0,
+            last_check=datetime.now(UTC),
+            error_message=None,
+        )
+
+    service.get_status = get_status
+
+    return service
+
+
+@pytest.fixture
+def mock_stt_service_for_orchestrator():
+    """Create a mock STT service optimized for orchestrator tests."""
+    service = MagicMock()
+    service.model_loaded = True
+    service._model_name = "reazonspeech-nemo-v2"
+    service._device = "cpu"
+
+    # Mock transcribe
+    async def mock_transcribe(audio_data: bytes, filename: str = "audio.wav"):
+        from src.models.stt import TranscriptionResponse
+
+        return TranscriptionResponse(
+            text="テスト音声入力",
+            duration_seconds=1.0,
+            processing_time_seconds=0.1,
+            segments=None,
+        )
+
+    service.transcribe = mock_transcribe
+
+    # Mock get_status
+    def get_status():
+        from src.models.stt import STTStatus
+
+        return STTStatus(
+            model_loaded=True,
+            model_name="reazonspeech-nemo-v2",
+            device="cpu",
+            memory_usage_mb=0.0,
+        )
+
+    service.get_status = get_status
+
+    return service
+
+
+@pytest.fixture
+async def orchestrator_client(
+    mock_stt_service_for_orchestrator, mock_llm_service, mock_tts_service
+):
+    """Create an async test client with all mocked services for orchestrator."""
+    from src.main import app
+    from src.services.orchestrator_service import OrchestratorService
+
+    set_stt_service(mock_stt_service_for_orchestrator)
+    set_llm_service(mock_llm_service)
+    set_tts_service(mock_tts_service)
+
+    # Create orchestrator service with mocked dependencies
+    orchestrator = OrchestratorService(
+        stt_service=mock_stt_service_for_orchestrator,
+        llm_service=mock_llm_service,
+        tts_service=mock_tts_service,
+    )
+    set_orchestrator_service(orchestrator)
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
