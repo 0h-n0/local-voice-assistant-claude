@@ -13,6 +13,7 @@ dependencies = [
     "soundfile>=0.12.0",
     "python-multipart>=0.0.6",
     "websockets>=12.0",
+    "openai>=1.12.0",
 ]
 
 [project.optional-dependencies]
@@ -58,7 +59,9 @@ select = [
     "C4",     # flake8-comprehensions
     "SIM",    # flake8-simplify
 ]
-ignore = []
+ignore = [
+    "E501",   # Line too long - handled by formatter, Japanese text can exceed
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -81,7 +84,7 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["pydub.*", "soundfile.*", "reazonspeech.*"]
+module = ["pydub.*", "soundfile.*", "reazonspeech.*", "openai.*"]
 ignore_missing_imports = true
 
 [dependency-groups]
