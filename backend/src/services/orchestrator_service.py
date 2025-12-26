@@ -16,6 +16,7 @@ from src.config import (
     ORCHESTRATOR_SEMAPHORE_TIMEOUT,
     ORCHESTRATOR_TIMEOUT,
 )
+from src.models.conversation import MessageRole
 from src.models.orchestrator import (
     HealthStatus,
     OrchestratorErrorCode,
@@ -23,6 +24,7 @@ from src.models.orchestrator import (
     ProcessingMetadata,
     ServiceStatus,
 )
+from src.services.conversation_storage_service import ConversationStorageService
 from src.services.llm_service import LLMService
 from src.services.stt_service import STTService
 from src.services.tts_service import TTSService
@@ -70,6 +72,7 @@ class OrchestratorService:
         stt_service: STTService,
         llm_service: LLMService,
         tts_service: TTSService,
+        storage_service: ConversationStorageService | None = None,
     ) -> None:
         """Initialize orchestrator service.
 
@@ -77,10 +80,12 @@ class OrchestratorService:
             stt_service: Speech-to-text service
             llm_service: Language model service
             tts_service: Text-to-speech service
+            storage_service: Optional conversation storage service
         """
         self._stt = stt_service
         self._llm = llm_service
         self._tts = tts_service
+        self._storage = storage_service
         self._semaphore = asyncio.Semaphore(ORCHESTRATOR_MAX_CONCURRENT)
 
     def validate_audio_format(
@@ -338,6 +343,31 @@ class OrchestratorService:
         )
 
         total_time = time.time() - start_time
+
+        # Save conversation history if storage service is available
+        if self._storage is not None:
+            try:
+                await self._storage.save_message(
+                    conversation_id=conversation_id,
+                    role=MessageRole.USER,
+                    content=recognized_text,
+                )
+                await self._storage.save_message(
+                    conversation_id=conversation_id,
+                    role=MessageRole.ASSISTANT,
+                    content=response_text,
+                )
+                logger.info(
+                    "Saved conversation history",
+                    extra={"conversation_id": conversation_id},
+                )
+            except Exception as e:
+                # Log but don't fail the dialogue - storage is non-critical
+                logger.warning(
+                    "Failed to save conversation history: %s",
+                    e,
+                    extra={"conversation_id": conversation_id},
+                )
 
         metadata = ProcessingMetadata(
             total_time=total_time,

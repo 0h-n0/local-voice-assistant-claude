@@ -1,0 +1,242 @@
+openapi: 3.1.0
+info:
+  title: Conversation History API
+  description: 会話履歴の取得・削除機能を提供するREST API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/conversations:
+    get:
+      operationId: listConversations
+      summary: 会話一覧を取得
+      description: 保存されている会話の一覧を最新順で取得する（ページネーション対応）
+      tags:
+        - Conversations
+      parameters:
+        - name: limit
+          in: query
+          description: 取得件数（最大100）
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: スキップ件数
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: 会話一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+        "503":
+          description: データベースエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationErrorResponse"
+
+  /api/conversations/{conversation_id}:
+    get:
+      operationId: getConversation
+      summary: 会話詳細を取得
+      description: 指定した会話IDの全メッセージを時系列順で取得する
+      tags:
+        - Conversations
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 会話ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 会話詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+        "404":
+          description: 会話が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationErrorResponse"
+        "503":
+          description: データベースエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationErrorResponse"
+
+    delete:
+      operationId: deleteConversation
+      summary: 会話を削除
+      description: 指定した会話IDの会話と関連するすべてのメッセージを削除する
+      tags:
+        - Conversations
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 会話ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: 削除成功
+        "404":
+          description: 会話が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationErrorResponse"
+        "503":
+          description: データベースエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationErrorResponse"
+
+components:
+  schemas:
+    MessageRole:
+      type: string
+      enum:
+        - user
+        - assistant
+      description: メッセージの発話者ロール
+
+    MessageResponse:
+      type: object
+      required:
+        - id
+        - role
+        - content
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: メッセージID
+        role:
+          $ref: "#/components/schemas/MessageRole"
+        content:
+          type: string
+          description: メッセージ内容
+          maxLength: 10000
+        created_at:
+          type: string
+          format: date-time
+          description: メッセージ作成日時 (UTC)
+
+    ConversationSummary:
+      type: object
+      required:
+        - id
+        - message_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 会話ID
+        message_count:
+          type: integer
+          description: メッセージ数
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          description: 会話開始日時 (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          description: 最終更新日時 (UTC)
+
+    ConversationDetail:
+      type: object
+      required:
+        - id
+        - messages
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 会話ID
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageResponse"
+          description: メッセージ一覧（時系列順）
+        created_at:
+          type: string
+          format: date-time
+          description: 会話開始日時 (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          description: 最終更新日時 (UTC)
+
+    ConversationListResponse:
+      type: object
+      required:
+        - conversations
+        - total
+        - limit
+        - offset
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+          description: 会話一覧
+        total:
+          type: integer
+          description: 総会話数
+          minimum: 0
+        limit:
+          type: integer
+          description: 取得件数
+        offset:
+          type: integer
+          description: スキップ件数
+
+    ConversationErrorCode:
+      type: string
+      enum:
+        - CONVERSATION_NOT_FOUND
+        - MESSAGE_TOO_LONG
+        - DATABASE_ERROR
+      description: エラーコード
+
+    ConversationErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          $ref: "#/components/schemas/ConversationErrorCode"
+        message:
+          type: string
+          description: エラーメッセージ
+        details:
+          type: object
+          additionalProperties: true
+          description: 追加のエラー詳細

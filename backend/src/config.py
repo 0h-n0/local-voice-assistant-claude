@@ -39,3 +39,8 @@ ORCHESTRATOR_MAX_AUDIO_DURATION: float = float(
 ORCHESTRATOR_MIN_AUDIO_DURATION: float = float(
     os.getenv("ORCHESTRATOR_MIN_AUDIO_DURATION", "0.5")
 )  # 0.5 seconds
+
+# Conversation Storage Configuration
+CONVERSATION_DB_PATH: str = os.getenv(
+    "CONVERSATION_DB_PATH", "data/conversations.db"
+)

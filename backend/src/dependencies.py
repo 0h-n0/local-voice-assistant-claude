@@ -1,5 +1,7 @@
 """Dependency injection for FastAPI."""
 
+from src.db.database import DatabaseManager
+from src.services.conversation_storage_service import ConversationStorageService
 from src.services.llm_service import LLMService
 from src.services.orchestrator_service import OrchestratorService
 from src.services.stt_service import STTService
@@ -10,6 +12,8 @@ _stt_service: STTService | None = None
 _llm_service: LLMService | None = None
 _tts_service: TTSService | None = None
 _orchestrator_service: OrchestratorService | None = None
+_db_manager: DatabaseManager | None = None
+_conversation_storage_service: ConversationStorageService | None = None
 
 
 def get_stt_service() -> STTService:
@@ -66,3 +70,31 @@ def set_orchestrator_service(service: OrchestratorService) -> None:
     """Set the Orchestrator service instance."""
     global _orchestrator_service  # noqa: PLW0603
     _orchestrator_service = service
+
+
+def get_db_manager() -> DatabaseManager:
+    """Get the database manager instance."""
+    if _db_manager is None:
+        msg = "Database manager not initialized"
+        raise RuntimeError(msg)
+    return _db_manager
+
+
+def set_db_manager(manager: DatabaseManager) -> None:
+    """Set the database manager instance."""
+    global _db_manager  # noqa: PLW0603
+    _db_manager = manager
+
+
+def get_conversation_storage_service() -> ConversationStorageService:
+    """Get the conversation storage service instance."""
+    if _conversation_storage_service is None:
+        msg = "Conversation storage service not initialized"
+        raise RuntimeError(msg)
+    return _conversation_storage_service
+
+
+def set_conversation_storage_service(service: ConversationStorageService) -> None:
+    """Set the conversation storage service instance."""
+    global _conversation_storage_service  # noqa: PLW0603
+    _conversation_storage_service = service

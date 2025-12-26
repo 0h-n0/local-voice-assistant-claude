@@ -10,6 +10,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-26
 - Python 3.11+ (Backend) + FastAPI, Pydantic v2, Style-Bert-VITS2, torch, scipy (004-tts-api)
 - Python 3.11+ (Backend) + FastAPI, Pydantic v2, httpx (内部サービス呼び出し用) (005-voice-orchestrator)
 - N/A（ステートレス処理、音声データは永続化しない） (005-voice-orchestrator)
+- Python 3.11+ + FastAPI, Pydantic v2, aiosqlite（非同期SQLiteアクセス） (006-conversation-storage)
+- SQLite（ローカルファイルシステム） (006-conversation-storage)
 
 - Python 3.11+ (Backend), TypeScript 5.x (Frontend)
 - FastAPI, Pydantic v2, uvicorn (Backend)
@@ -62,9 +64,9 @@ npm run lint     # Lint
 - TypeScript: Strict mode, prefer functional components
 
 ## Recent Changes
+- 006-conversation-storage: Added Python 3.11+ + FastAPI, Pydantic v2, aiosqlite（非同期SQLiteアクセス）
 - 005-voice-orchestrator: Added Python 3.11+ (Backend) + FastAPI, Pydantic v2, httpx (内部サービス呼び出し用)
 - 004-tts-api: Added Python 3.11+ (Backend) + FastAPI, Pydantic v2, Style-Bert-VITS2, torch, scipy
-- 003-llm-text-service: Added Python 3.11+ + FastAPI, Pydantic v2, OpenAI Python SDK, httpx (async HTTP)
 
 
 <!-- MANUAL ADDITIONS START -->
