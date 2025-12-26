@@ -24,9 +24,26 @@ class TestLLMServiceGenerateResponse:
     @pytest.fixture
     def llm_service(self):
         """Create LLM service with mocked API key."""
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            service = LLMService()
-            return service
+        import importlib
+
+        from src.models import config as config_module
+        from src.services import llm_service as llm_module
+
+        # Clear settings cache
+        config_module.get_settings.cache_clear()
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False):
+            # Reload config module to pick up new env vars
+            importlib.reload(config_module)
+            # Reload llm_service to use new settings
+            importlib.reload(llm_module)
+            service = llm_module.LLMService()
+            yield service
+
+        # Clean up - reload with original settings
+        config_module.get_settings.cache_clear()
+        importlib.reload(config_module)
+        importlib.reload(llm_module)
 
     @pytest.fixture
     def mock_openai_response(self):
@@ -253,30 +270,65 @@ class TestConversationCache:
 class TestLLMServiceStatus:
     """Tests for LLMService.get_status()."""
 
-    def test_status_healthy_with_api_key(self):
+    def test_status_healthy_with_api_key(self) -> None:
         """Test healthy status when API key is configured."""
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            service = LLMService()
+        import importlib
+
+        from src.models import config as config_module
+        from src.services import llm_service as llm_module
+
+        config_module.get_settings.cache_clear()
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False):
+            importlib.reload(config_module)
+            importlib.reload(llm_module)
+            service = llm_module.LLMService()
             status = service.get_status()
 
             assert status.status == ServiceStatus.HEALTHY
             assert status.api_configured is True
             assert status.model == "gpt-4o-mini"
 
-    def test_status_unhealthy_no_api_key(self):
+        config_module.get_settings.cache_clear()
+        importlib.reload(config_module)
+        importlib.reload(llm_module)
+
+    def test_status_unhealthy_no_api_key(self) -> None:
         """Test unhealthy status when API key is missing."""
-        with patch.dict("os.environ", {}, clear=True):
-            service = LLMService()
+        import importlib
+
+        from src.models import config as config_module
+        from src.services import llm_service as llm_module
+
+        config_module.get_settings.cache_clear()
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False):
+            importlib.reload(config_module)
+            importlib.reload(llm_module)
+            service = llm_module.LLMService()
             status = service.get_status()
 
             assert status.status == ServiceStatus.UNHEALTHY
             assert status.api_configured is False
             assert "OPENAI_API_KEY" in (status.error_message or "")
 
-    def test_status_tracks_active_conversations(self):
+        config_module.get_settings.cache_clear()
+        importlib.reload(config_module)
+        importlib.reload(llm_module)
+
+    def test_status_tracks_active_conversations(self) -> None:
         """Test that status includes active conversation count."""
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            service = LLMService()
+        import importlib
+
+        from src.models import config as config_module
+        from src.services import llm_service as llm_module
+
+        config_module.get_settings.cache_clear()
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False):
+            importlib.reload(config_module)
+            importlib.reload(llm_module)
+            service = llm_module.LLMService()
             # Add some conversations manually
             service._conversation_cache.add_message("conv-1", "user", "hello")
             service._conversation_cache.add_message("conv-2", "user", "hi")
@@ -284,3 +336,7 @@ class TestLLMServiceStatus:
             status = service.get_status()
 
             assert status.active_conversations == 2
+
+        config_module.get_settings.cache_clear()
+        importlib.reload(config_module)
+        importlib.reload(llm_module)

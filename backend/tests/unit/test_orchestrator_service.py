@@ -161,7 +161,8 @@ class TestOrchestratorServicePipeline:
         with pytest.raises(OrchestratorError) as exc_info:
             await service.process_dialogue(wav_data, "test.wav", speed=1.0)
 
-        assert exc_info.value.error_code == OrchestratorErrorCode.STT_SERVICE_UNAVAILABLE
+        expected = OrchestratorErrorCode.STT_SERVICE_UNAVAILABLE
+        assert exc_info.value.error_code == expected
 
     @pytest.mark.asyncio
     async def test_process_dialogue_llm_failure(self):
@@ -197,7 +198,8 @@ class TestOrchestratorServicePipeline:
         with pytest.raises(OrchestratorError) as exc_info:
             await service.process_dialogue(wav_data, "test.wav", speed=1.0)
 
-        assert exc_info.value.error_code == OrchestratorErrorCode.LLM_SERVICE_UNAVAILABLE
+        expected = OrchestratorErrorCode.LLM_SERVICE_UNAVAILABLE
+        assert exc_info.value.error_code == expected
 
     @pytest.mark.asyncio
     async def test_process_dialogue_tts_failure(self):
@@ -237,7 +239,8 @@ class TestOrchestratorServicePipeline:
         with pytest.raises(OrchestratorError) as exc_info:
             await service.process_dialogue(wav_data, "test.wav", speed=1.0)
 
-        assert exc_info.value.error_code == OrchestratorErrorCode.TTS_SERVICE_UNAVAILABLE
+        expected = OrchestratorErrorCode.TTS_SERVICE_UNAVAILABLE
+        assert exc_info.value.error_code == expected
 
     @pytest.mark.asyncio
     async def test_process_dialogue_empty_transcription(self):
@@ -270,7 +273,8 @@ class TestOrchestratorServicePipeline:
         with pytest.raises(OrchestratorError) as exc_info:
             await service.process_dialogue(wav_data, "test.wav", speed=1.0)
 
-        assert exc_info.value.error_code == OrchestratorErrorCode.SPEECH_RECOGNITION_FAILED
+        expected = OrchestratorErrorCode.SPEECH_RECOGNITION_FAILED
+        assert exc_info.value.error_code == expected
 
 
 class TestOrchestratorServiceErrorCodes:

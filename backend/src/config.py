@@ -1,58 +1,95 @@
-"""Configuration settings for the Local Voice Assistant Backend."""
+"""Configuration settings for the Local Voice Assistant Backend.
 
-import os
+This module provides backward-compatible exports from the new pydantic-settings
+based configuration system. All values are sourced from the Settings model.
+
+Usage:
+    # New style (recommended)
+    from src.models.config import settings
+    print(settings.tts.model_path)
+
+    # Legacy style (backward compatible)
+    from src.config import TTS_MODEL_PATH
+    print(TTS_MODEL_PATH)
+"""
+
 from pathlib import Path
 
-# TTS Configuration
-TTS_MODEL_PATH: Path = Path(
-    os.getenv("TTS_MODEL_PATH", "model_assets/jvnv-F1-jp")
-)
-TTS_DEVICE: str = os.getenv("TTS_DEVICE", "cpu")
-TTS_MAX_CONCURRENT: int = int(os.getenv("TTS_MAX_CONCURRENT", "3"))
+from src.models.config import settings
+
+# =============================================================================
+# TTS Configuration (backward compatible exports)
+# =============================================================================
+
+TTS_MODEL_PATH: Path = settings.tts.model_path
+TTS_DEVICE: str = settings.tts.device
+TTS_MAX_CONCURRENT: int = settings.tts.max_concurrent
 
 # TTS Model file names (within TTS_MODEL_PATH)
-TTS_MODEL_FILE: str = os.getenv("TTS_MODEL_FILE", "jvnv-F1-jp_e160_s14000.safetensors")
-TTS_CONFIG_FILE: str = "config.json"
-TTS_STYLE_VEC_FILE: str = "style_vectors.npy"
+TTS_MODEL_FILE: str = settings.tts.model_file
+TTS_CONFIG_FILE: str = settings.tts.config_file
+TTS_STYLE_VEC_FILE: str = settings.tts.style_vec_file
 
 # BERT model for Japanese TTS
-TTS_BERT_MODEL: str = "ku-nlp/deberta-v2-large-japanese-char-wwm"
+TTS_BERT_MODEL: str = settings.tts.bert_model
 
 # Text limits
-TTS_MAX_TEXT_LENGTH: int = 5000
-TTS_MIN_TEXT_LENGTH: int = 1
+TTS_MAX_TEXT_LENGTH: int = settings.tts.max_text_length
+TTS_MIN_TEXT_LENGTH: int = settings.tts.min_text_length
 
 # Speed limits
-TTS_MIN_SPEED: float = 0.5
-TTS_MAX_SPEED: float = 2.0
-TTS_DEFAULT_SPEED: float = 1.0
+TTS_MIN_SPEED: float = settings.tts.min_speed
+TTS_MAX_SPEED: float = settings.tts.max_speed
+TTS_DEFAULT_SPEED: float = settings.tts.default_speed
 
+# =============================================================================
 # Orchestrator Configuration
-ORCHESTRATOR_MAX_CONCURRENT: int = int(os.getenv("ORCHESTRATOR_MAX_CONCURRENT", "5"))
-ORCHESTRATOR_TIMEOUT: float = float(os.getenv("ORCHESTRATOR_TIMEOUT", "30"))  # seconds
-ORCHESTRATOR_SEMAPHORE_TIMEOUT: float = float(
-    os.getenv("ORCHESTRATOR_SEMAPHORE_TIMEOUT", "2.0")
-)  # seconds to wait for semaphore
-ORCHESTRATOR_MAX_AUDIO_DURATION: float = float(
-    os.getenv("ORCHESTRATOR_MAX_AUDIO_DURATION", "300")
-)  # 5 minutes
-ORCHESTRATOR_MIN_AUDIO_DURATION: float = float(
-    os.getenv("ORCHESTRATOR_MIN_AUDIO_DURATION", "0.5")
-)  # 0.5 seconds
+# =============================================================================
 
+ORCHESTRATOR_MAX_CONCURRENT: int = settings.orchestrator.max_concurrent
+ORCHESTRATOR_TIMEOUT: float = settings.orchestrator.timeout
+ORCHESTRATOR_SEMAPHORE_TIMEOUT: float = settings.orchestrator.semaphore_timeout
+ORCHESTRATOR_MAX_AUDIO_DURATION: float = settings.orchestrator.max_audio_duration
+ORCHESTRATOR_MIN_AUDIO_DURATION: float = settings.orchestrator.min_audio_duration
+
+# =============================================================================
 # Conversation Storage Configuration
-# Default path is relative to the backend directory
-_BACKEND_DIR = Path(__file__).parent.parent
-_DEFAULT_DB_PATH = str(_BACKEND_DIR / "data" / "conversations.db")
-CONVERSATION_DB_PATH: str = os.getenv("CONVERSATION_DB_PATH", _DEFAULT_DB_PATH)
+# =============================================================================
 
+CONVERSATION_DB_PATH: str = settings.storage.conversation_db_path
+
+# =============================================================================
 # WebSocket Configuration
-WS_HEARTBEAT_INTERVAL: int = int(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))  # seconds
-WS_MAX_AUDIO_DURATION: int = int(os.getenv("WS_MAX_AUDIO_DURATION", "60"))  # seconds
-WS_AUDIO_CHUNK_INTERVAL: int = int(os.getenv("WS_AUDIO_CHUNK_INTERVAL", "100"))  # ms
+# =============================================================================
 
+WS_HEARTBEAT_INTERVAL: int = settings.websocket.heartbeat_interval
+WS_MAX_AUDIO_DURATION: int = settings.websocket.max_audio_duration
+WS_AUDIO_CHUNK_INTERVAL: int = settings.websocket.audio_chunk_interval
+
+# =============================================================================
 # Deepgram STT Configuration
-DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
-DEEPGRAM_MODEL: str = os.getenv("DEEPGRAM_MODEL", "nova-2")
-DEEPGRAM_LANGUAGE: str = os.getenv("DEEPGRAM_LANGUAGE", "ja")  # Japanese
-DEEPGRAM_SAMPLE_RATE: int = int(os.getenv("DEEPGRAM_SAMPLE_RATE", "16000"))
+# =============================================================================
+
+# Note: DEEPGRAM_API_KEY is a SecretStr, use .get_secret_value() when needed
+DEEPGRAM_API_KEY: str = settings.deepgram.api_key.get_secret_value()
+DEEPGRAM_MODEL: str = settings.deepgram.model
+DEEPGRAM_LANGUAGE: str = settings.deepgram.language
+DEEPGRAM_SAMPLE_RATE: int = settings.deepgram.sample_rate
+
+# =============================================================================
+# OpenAI Configuration
+# =============================================================================
+
+# Note: OPENAI_API_KEY is a SecretStr, use .get_secret_value() when needed
+OPENAI_API_KEY: str = settings.openai.api_key.get_secret_value()
+OPENAI_MODEL: str = settings.openai.model
+OPENAI_BASE_URL: str = settings.openai.base_url
+OPENAI_MAX_TOKENS: int = settings.openai.max_tokens
+OPENAI_MAX_CONCURRENT: int = settings.openai.max_concurrent
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+LOG_LEVEL: str = settings.log_level
+DEBUG: bool = settings.debug

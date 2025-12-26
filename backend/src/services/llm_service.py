@@ -2,11 +2,11 @@
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from src.models.config import settings
 from src.models.llm import ErrorCode, LLMStatus, ServiceStatus, TokenUsage
 
 if TYPE_CHECKING:
@@ -159,12 +159,11 @@ class LLMService:
     def __init__(self) -> None:
         """Initialize LLM service."""
         self._client: AsyncOpenAI | None = None
-        self._model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
-        self._max_tokens = int(os.getenv("LLM_MAX_TOKENS", str(DEFAULT_MAX_TOKENS)))
-        self._api_key = os.getenv("OPENAI_API_KEY")
-        self._semaphore = asyncio.Semaphore(
-            int(os.getenv("LLM_MAX_CONCURRENT", str(MAX_CONCURRENT_REQUESTS)))
-        )
+        self._model = settings.openai.model
+        self._max_tokens = settings.openai.max_tokens
+        self._api_key = settings.openai.api_key.get_secret_value()
+        self._base_url = settings.openai.base_url
+        self._semaphore = asyncio.Semaphore(settings.openai.max_concurrent)
         self._conversation_cache = ConversationCache()
         self._last_check: datetime | None = None
         self._last_error: str | None = None
@@ -177,8 +176,19 @@ class LLMService:
         try:
             from openai import AsyncOpenAI
 
-            self._client = AsyncOpenAI(api_key=self._api_key)
-            logger.info("OpenAI client initialized with model: %s", self._model)
+            # Use base_url if configured, otherwise use default OpenAI endpoint
+            if self._base_url:
+                self._client = AsyncOpenAI(
+                    api_key=self._api_key, base_url=self._base_url
+                )
+                logger.info(
+                    "OpenAI client initialized with model: %s, base_url: %s",
+                    self._model,
+                    self._base_url,
+                )
+            else:
+                self._client = AsyncOpenAI(api_key=self._api_key)
+                logger.info("OpenAI client initialized with model: %s", self._model)
         except Exception as e:
             logger.exception("Failed to initialize OpenAI client")
             self._last_error = str(e)
