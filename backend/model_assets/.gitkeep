@@ -1,0 +1,8 @@
+# TTS Model Assets Directory
+#
+# Place Style-Bert-VITS2 model files here:
+# - model_assets/jvnv-F1-jp/config.json
+# - model_assets/jvnv-F1-jp/jvnv-F1-jp_e160_s14000.safetensors
+# - model_assets/jvnv-F1-jp/style_vectors.npy
+#
+# Download from Hugging Face Hub or other sources.

@@ -2,10 +2,12 @@
 
 from src.services.llm_service import LLMService
 from src.services.stt_service import STTService
+from src.services.tts_service import TTSService
 
 # Global service instances
 _stt_service: STTService | None = None
 _llm_service: LLMService | None = None
+_tts_service: TTSService | None = None
 
 
 def get_stt_service() -> STTService:
@@ -34,3 +36,17 @@ def set_llm_service(service: LLMService) -> None:
     """Set the LLM service instance."""
     global _llm_service  # noqa: PLW0603
     _llm_service = service
+
+
+def get_tts_service() -> TTSService:
+    """Get the TTS service instance."""
+    if _tts_service is None:
+        msg = "TTS service not initialized"
+        raise RuntimeError(msg)
+    return _tts_service
+
+
+def set_tts_service(service: TTSService) -> None:
+    """Set the TTS service instance."""
+    global _tts_service  # noqa: PLW0603
+    _tts_service = service

@@ -10,9 +10,11 @@ from src import __version__
 from src.api.health import router as health_router
 from src.api.llm import router as llm_router
 from src.api.stt import router as stt_router
-from src.dependencies import set_llm_service, set_stt_service
+from src.api.tts import router as tts_router
+from src.dependencies import set_llm_service, set_stt_service, set_tts_service
 from src.services.llm_service import LLMService
 from src.services.stt_service import STTService
+from src.services.tts_service import TTSService
 
 
 @asynccontextmanager
@@ -26,6 +28,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize LLM service
     llm_service = LLMService()
     set_llm_service(llm_service)
+
+    # Initialize TTS service
+    tts_service = TTSService()
+    set_tts_service(tts_service)
+    try:
+        await tts_service.load_model()
+    except Exception as e:
+        # Log but don't fail startup - status endpoint will show unhealthy
+        import logging
+
+        logging.getLogger(__name__).warning(f"Failed to load TTS model: {e}")
 
     yield
     # Cleanup on shutdown if needed
@@ -53,3 +66,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(stt_router)
 app.include_router(llm_router)
+app.include_router(tts_router)

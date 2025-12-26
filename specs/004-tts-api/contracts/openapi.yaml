@@ -1,0 +1,243 @@
+openapi: 3.1.0
+info:
+  title: TTS API (Text-to-Speech)
+  description: |
+    日本語テキストを自然な音声に変換する TTS API。
+    Style-Bert-VITS2 を使用してローカルで音声合成を実行。
+  version: 1.0.0
+  contact:
+    name: Local Voice Assistant
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/tts/synthesize:
+    post:
+      summary: Synthesize Speech
+      description: |
+        日本語テキストから音声を合成し、WAV 形式で返却する。
+      operationId: synthesize
+      tags:
+        - TTS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TTSSynthesisRequest'
+            examples:
+              simple_text:
+                summary: Simple text
+                value:
+                  text: "こんにちは"
+                  speed: 1.0
+              fast_speech:
+                summary: Fast speech
+                value:
+                  text: "早口で話します。"
+                  speed: 1.5
+              slow_speech:
+                summary: Slow speech
+                value:
+                  text: "ゆっくり話します。"
+                  speed: 0.7
+      responses:
+        '200':
+          description: Successfully synthesized audio
+          headers:
+            X-Processing-Time:
+              description: Processing time in seconds
+              schema:
+                type: number
+                format: float
+            X-Audio-Length:
+              description: Audio length in seconds
+              schema:
+                type: number
+                format: float
+            X-Sample-Rate:
+              description: Audio sample rate in Hz
+              schema:
+                type: integer
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TTSErrorResponse'
+              examples:
+                empty_text:
+                  summary: Empty text
+                  value:
+                    error_code: "EMPTY_TEXT"
+                    message: "Text content is empty or whitespace only"
+                text_too_long:
+                  summary: Text too long
+                  value:
+                    error_code: "TEXT_TOO_LONG"
+                    message: "Text exceeds 5000 character limit"
+                    details:
+                      max_length: 5000
+                      provided_length: 6000
+                invalid_speed:
+                  summary: Invalid speed
+                  value:
+                    error_code: "INVALID_SPEED"
+                    message: "Speed must be between 0.5 and 2.0"
+                    details:
+                      min: 0.5
+                      max: 2.0
+                      provided: 3.0
+        '500':
+          description: Synthesis error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TTSErrorResponse'
+              example:
+                error_code: "SYNTHESIS_FAILED"
+                message: "Failed to synthesize audio"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TTSErrorResponse'
+              examples:
+                model_not_loaded:
+                  summary: Model not loaded
+                  value:
+                    error_code: "MODEL_NOT_LOADED"
+                    message: "TTS model is not loaded"
+                service_busy:
+                  summary: Service busy
+                  value:
+                    error_code: "SERVICE_BUSY"
+                    message: "Service is processing too many requests"
+
+  /api/tts/status:
+    get:
+      summary: Get Service Status
+      description: |
+        TTS サービスの健全性とモデル状態を確認する。
+      operationId: getStatus
+      tags:
+        - TTS
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TTSStatus'
+              examples:
+                healthy:
+                  summary: Healthy service
+                  value:
+                    status: "healthy"
+                    model_loaded: true
+                    model_name: "jvnv-F1-jp"
+                    device: "cpu"
+                    last_check: "2025-12-26T10:30:00Z"
+                unhealthy:
+                  summary: Unhealthy service
+                  value:
+                    status: "unhealthy"
+                    model_loaded: false
+                    model_name: null
+                    device: "cpu"
+                    last_check: "2025-12-26T10:30:00Z"
+                    error_message: "Failed to load TTS model"
+
+components:
+  schemas:
+    TTSSynthesisRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+          description: 合成する日本語テキスト
+          example: "こんにちは、音声アシスタントです。"
+        speed:
+          type: number
+          format: float
+          minimum: 0.5
+          maximum: 2.0
+          default: 1.0
+          description: "話速スケール（0.5=遅い、1.0=通常、2.0=速い）"
+          example: 1.0
+
+    TTSStatus:
+      type: object
+      required:
+        - status
+        - model_loaded
+        - device
+        - last_check
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: サービス健全性ステータス
+        model_loaded:
+          type: boolean
+          description: TTS モデルがロードされているか
+        model_name:
+          type: string
+          nullable: true
+          description: ロードされているモデル名
+          example: "jvnv-F1-jp"
+        device:
+          type: string
+          description: 推論デバイス
+          example: "cpu"
+        last_check:
+          type: string
+          format: date-time
+          description: 最終ヘルスチェック時刻
+        error_message:
+          type: string
+          nullable: true
+          description: エラー詳細（status が healthy でない場合）
+
+    TTSErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          enum:
+            - EMPTY_TEXT
+            - TEXT_TOO_LONG
+            - INVALID_SPEED
+            - MODEL_NOT_LOADED
+            - SYNTHESIS_FAILED
+            - SERVICE_BUSY
+          description: 機械可読エラーコード
+        message:
+          type: string
+          description: 人間可読エラーメッセージ
+        details:
+          type: object
+          additionalProperties: true
+          description: 追加エラー情報
+
+tags:
+  - name: TTS
+    description: Text-to-Speech synthesis endpoints
