@@ -225,6 +225,25 @@ class TestConversationCache:
 
         assert cache.count() == 2
 
+    def test_cache_eviction_at_capacity(self):
+        """Test that oldest conversations are evicted when cache is at capacity."""
+        cache = ConversationCache(max_conversations=3)
+
+        # Add 3 conversations
+        cache.add_message("conv-1", "user", "First")
+        cache.add_message("conv-2", "user", "Second")
+        cache.add_message("conv-3", "user", "Third")
+
+        assert cache.count() == 3
+
+        # Add a 4th conversation - oldest (conv-1) should be evicted
+        cache.add_message("conv-4", "user", "Fourth")
+
+        assert cache.count() == 3
+        # conv-1 should be evicted
+        conv = cache.get_or_create("conv-1")
+        assert conv.messages == []  # New conversation, not the old one
+
 
 # =============================================================================
 # User Story 3: サービス健全性の確認 (T037)
@@ -247,12 +266,6 @@ class TestLLMServiceStatus:
     def test_status_unhealthy_no_api_key(self):
         """Test unhealthy status when API key is missing."""
         with patch.dict("os.environ", {}, clear=True):
-            # Clear any existing env var
-            import os
-
-            if "OPENAI_API_KEY" in os.environ:
-                del os.environ["OPENAI_API_KEY"]
-
             service = LLMService()
             status = service.get_status()
 

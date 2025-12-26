@@ -42,11 +42,6 @@ def llm_service_with_mock(mock_openai_response):
 def llm_service_unconfigured():
     """Create LLM service without API key."""
     with patch.dict("os.environ", {}, clear=True):
-        import os
-
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
-
         service = LLMService()
         set_llm_service(service)
         yield service

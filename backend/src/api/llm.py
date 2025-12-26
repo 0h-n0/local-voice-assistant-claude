@@ -74,17 +74,6 @@ async def chat(request: LLMRequest) -> LLMResponse:
     # Validate conversation ID format
     _validate_conversation_id(request.conversation_id)
 
-    # Validate message is not just whitespace
-    if not request.message.strip():
-        logger.warning("Chat request rejected: empty message")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorResponse(
-                error_code=ErrorCode.EMPTY_MESSAGE,
-                message="Message content is empty or whitespace",
-            ).model_dump(),
-        )
-
     try:
         llm_service = get_llm_service()
     except RuntimeError as e:

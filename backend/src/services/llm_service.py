@@ -5,25 +5,31 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING
 
 from src.models.llm import ErrorCode, LLMStatus, ServiceStatus, TokenUsage
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-SYSTEM_PROMPT = """あなたは日本語の音声アシスタントです。以下のガイドラインに従ってください：
-
-1. 簡潔で自然な日本語で応答してください
-2. 音声で読み上げることを考慮し、長すぎる回答は避けてください
-3. 丁寧語（です・ます調）を使用してください
-4. 質問に対して正確かつ役立つ情報を提供してください
-5. 分からないことは正直に「分かりません」と答えてください
-
-応答は音声合成で読み上げられることを想定し、箇条書きや記号の使用は最小限にしてください。"""
+# fmt: off
+SYSTEM_PROMPT = (
+    "あなたは日本語の音声アシスタントです。以下のガイドラインに従ってください：\n\n"
+    "1. 簡潔で自然な日本語で応答してください\n"
+    "2. 音声で読み上げることを考慮し、長すぎる回答は避けてください\n"
+    "3. 丁寧語（です・ます調）を使用してください\n"
+    "4. 質問に対して正確かつ役立つ情報を提供してください\n"
+    "5. 分からないことは正直に「分かりません」と答えてください\n\n"
+    "応答は音声合成で読み上げられることを想定し、箇条書きや記号の使用は最小限にしてください。"
+)
+# fmt: on
 
 MAX_MESSAGE_LENGTH = 4000
 MAX_CONVERSATION_MESSAGES = 20
+MAX_CONVERSATIONS = 1000
 MAX_CONCURRENT_REQUESTS = 10
 CONVERSATION_TTL_MINUTES = 60
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -46,16 +52,19 @@ class ConversationCache:
     def __init__(
         self,
         max_messages: int = MAX_CONVERSATION_MESSAGES,
+        max_conversations: int = MAX_CONVERSATIONS,
         ttl_minutes: int = CONVERSATION_TTL_MINUTES,
     ) -> None:
         """Initialize conversation cache.
 
         Args:
             max_messages: Maximum messages per conversation
+            max_conversations: Maximum number of conversations to cache
             ttl_minutes: Time-to-live in minutes for conversations
         """
         self._cache: dict[str, Conversation] = {}
         self._max_messages = max_messages
+        self._max_conversations = max_conversations
         self._ttl = timedelta(minutes=ttl_minutes)
 
     def get_or_create(self, conversation_id: str) -> Conversation:
@@ -69,6 +78,8 @@ class ConversationCache:
         """
         self._cleanup_expired()
         if conversation_id not in self._cache:
+            # Evict oldest conversations if at capacity
+            self._evict_oldest_if_needed()
             self._cache[conversation_id] = Conversation(id=conversation_id)
             logger.debug("Created new conversation: %s", conversation_id)
         return self._cache[conversation_id]
@@ -129,13 +140,25 @@ class ConversationCache:
         if expired:
             logger.debug("Cleaned up %d expired conversations", len(expired))
 
+    def _evict_oldest_if_needed(self) -> None:
+        """Evict oldest conversations if cache is at capacity."""
+        if len(self._cache) >= self._max_conversations:
+            # Sort by updated_at and remove oldest
+            sorted_convs = sorted(self._cache.items(), key=lambda x: x[1].updated_at)
+            to_evict = len(self._cache) - self._max_conversations + 1
+            for conv_id, _ in sorted_convs[:to_evict]:
+                del self._cache[conv_id]
+            logger.debug(
+                "Evicted %d oldest conversations (cache at capacity)", to_evict
+            )
+
 
 class LLMService:
     """Service for LLM text generation using OpenAI API."""
 
     def __init__(self) -> None:
         """Initialize LLM service."""
-        self._client: Any = None
+        self._client: AsyncOpenAI | None = None
         self._model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
         self._max_tokens = int(os.getenv("LLM_MAX_TOKENS", str(DEFAULT_MAX_TOKENS)))
         self._api_key = os.getenv("OPENAI_API_KEY")
@@ -233,7 +256,7 @@ class LLMService:
 
             response = await self._client.chat.completions.create(
                 model=self._model,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
                 max_tokens=self._max_tokens,
             )
 
