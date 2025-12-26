@@ -39,3 +39,9 @@ ORCHESTRATOR_MAX_AUDIO_DURATION: float = float(
 ORCHESTRATOR_MIN_AUDIO_DURATION: float = float(
     os.getenv("ORCHESTRATOR_MIN_AUDIO_DURATION", "0.5")
 )  # 0.5 seconds
+
+# Conversation Storage Configuration
+# Default path is relative to the backend directory
+_BACKEND_DIR = Path(__file__).parent.parent
+_DEFAULT_DB_PATH = str(_BACKEND_DIR / "data" / "conversations.db")
+CONVERSATION_DB_PATH: str = os.getenv("CONVERSATION_DB_PATH", _DEFAULT_DB_PATH)

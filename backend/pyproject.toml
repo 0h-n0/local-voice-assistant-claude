@@ -16,6 +16,7 @@ dependencies = [
     "openai>=1.12.0",
     "style-bert-vits2>=2.5.0",
     "scipy>=1.10.0",
+    "aiosqlite>=0.22.1",
 ]
 
 [project.optional-dependencies]
