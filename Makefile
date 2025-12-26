@@ -71,7 +71,7 @@ backend: check-deps check-env ## Start backend server only (FastAPI with hot rel
 
 frontend: check-deps ## Start frontend server only (Next.js dev server)
 	@echo "$(BLUE)Starting frontend on http://localhost:$(FRONTEND_PORT)$(NC)"
-	cd frontend && npm run dev
+	cd frontend && npm run dev -- --port $(FRONTEND_PORT)
 
 dev: check-deps check-env ## Start all services (backend + frontend) with hot reload
 	@echo "$(BLUE)Starting development environment...$(NC)"
@@ -81,7 +81,7 @@ dev: check-deps check-env ## Start all services (backend + frontend) with hot re
 	@echo ""
 	@trap 'kill 0' SIGINT SIGTERM EXIT; \
 	(cd backend && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port $(BACKEND_PORT)) & \
-	(cd frontend && npm run dev) & \
+	(cd frontend && npm run dev -- --port $(FRONTEND_PORT)) & \
 	wait
 
 #==============================================================================
@@ -90,8 +90,8 @@ dev: check-deps check-env ## Start all services (backend + frontend) with hot re
 
 down: ## Stop all running services on dev ports
 	@echo "$(BLUE)Stopping services...$(NC)"
-	@-lsof -ti:$(BACKEND_PORT) | xargs -r kill -9 2>/dev/null || true
-	@-lsof -ti:$(FRONTEND_PORT) | xargs -r kill -9 2>/dev/null || true
+	@-pids=$$(lsof -ti:$(BACKEND_PORT)); [ -n "$$pids" ] && kill -9 $$pids 2>/dev/null || true
+	@-pids=$$(lsof -ti:$(FRONTEND_PORT)); [ -n "$$pids" ] && kill -9 $$pids 2>/dev/null || true
 	@echo "$(GREEN)All services stopped$(NC)"
 
 clean: down ## Stop services and clean temporary files
