@@ -3,6 +3,11 @@
 Tests verify API responses match the OpenAPI specification.
 """
 
+import asyncio
+import uuid
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,18 +20,30 @@ from src.main import app
 from src.models.conversation import MessageRole
 from src.services.conversation_storage_service import ConversationStorageService
 
+T = TypeVar("T")
+
+
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+    """Run an async coroutine in a new event loop.
+
+    This avoids the deprecated asyncio.get_event_loop() warning in Python 3.10+.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
 
 @pytest.fixture
 def test_db(tmp_path):
     """Create a temporary database for testing."""
-    import asyncio
-
     db_path = str(tmp_path / "test_conversations.db")
     manager = DatabaseManager(db_path)
-    asyncio.get_event_loop().run_until_complete(manager.initialize())
+    _run_async(manager.initialize())
     set_db_manager(manager)
     yield manager
-    asyncio.get_event_loop().run_until_complete(manager.close())
+    _run_async(manager.close())
 
 
 @pytest.fixture
@@ -90,17 +107,15 @@ class TestGetConversationContract:
     @pytest.fixture
     def sample_conversation(self, storage_service):
         """Create a sample conversation for testing."""
-        import asyncio
-
-        conversation_id = "contract-test-conv"
-        asyncio.get_event_loop().run_until_complete(
+        conversation_id = str(uuid.uuid4())
+        _run_async(
             storage_service.save_message(
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
                 content="Hello",
             )
         )
-        asyncio.get_event_loop().run_until_complete(
+        _run_async(
             storage_service.save_message(
                 conversation_id=conversation_id,
                 role=MessageRole.ASSISTANT,
@@ -141,7 +156,8 @@ class TestGetConversationContract:
 
     def test_not_found_error_format(self, client):
         """Test 404 error response format matches OpenAPI spec."""
-        response = client.get("/api/conversations/nonexistent-id")
+        nonexistent_uuid = str(uuid.uuid4())
+        response = client.get(f"/api/conversations/{nonexistent_uuid}")
         assert response.status_code == 404
 
         data = response.json()
@@ -158,10 +174,8 @@ class TestDeleteConversationContract:
     @pytest.fixture
     def deletable_conversation(self, storage_service):
         """Create a conversation that can be deleted."""
-        import asyncio
-
-        conversation_id = "delete-test-conv"
-        asyncio.get_event_loop().run_until_complete(
+        conversation_id = str(uuid.uuid4())
+        _run_async(
             storage_service.save_message(
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
@@ -178,7 +192,8 @@ class TestDeleteConversationContract:
 
     def test_not_found_error_format(self, client):
         """Test 404 error response format matches OpenAPI spec."""
-        response = client.delete("/api/conversations/nonexistent-id")
+        nonexistent_uuid = str(uuid.uuid4())
+        response = client.delete(f"/api/conversations/{nonexistent_uuid}")
         assert response.status_code == 404
 
         data = response.json()

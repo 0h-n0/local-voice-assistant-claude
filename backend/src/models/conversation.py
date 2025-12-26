@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class MessageRole(str, Enum):
@@ -12,14 +12,6 @@ class MessageRole(str, Enum):
 
     USER = "user"
     ASSISTANT = "assistant"
-
-
-class MessageCreate(BaseModel):
-    """Internal model for creating messages (from orchestrator)."""
-
-    conversation_id: str
-    role: MessageRole
-    content: str = Field(..., min_length=1, max_length=10000)
 
 
 class MessageResponse(BaseModel):

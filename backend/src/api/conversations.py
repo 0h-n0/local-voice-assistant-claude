@@ -1,9 +1,10 @@
 """REST API endpoints for conversation history."""
 
 import logging
+import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from src.dependencies import get_conversation_storage_service
 from src.models.conversation import (
@@ -20,6 +21,21 @@ from src.services.conversation_storage_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversations", tags=["Conversations"])
+
+# UUID validation pattern
+UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+def _validate_uuid(conversation_id: str) -> None:
+    """Validate that conversation_id is a valid UUID format."""
+    if not re.match(UUID_PATTERN, conversation_id, re.IGNORECASE):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ConversationErrorResponse(
+                error_code=ConversationErrorCode.CONVERSATION_NOT_FOUND,
+                message=f"Invalid conversation ID format: {conversation_id}",
+            ).model_dump(),
+        )
 
 
 @router.get(
@@ -65,7 +81,7 @@ async def list_conversations(
     },
 )
 async def get_conversation(
-    conversation_id: str,
+    conversation_id: Annotated[str, Path(description="Conversation ID (UUID format)")],
     storage: ConversationStorageService = Depends(  # noqa: B008
         get_conversation_storage_service
     ),
@@ -74,6 +90,7 @@ async def get_conversation(
 
     Returns the full conversation detail including all messages in chronological order.
     """
+    _validate_uuid(conversation_id)
     try:
         return await storage.get_conversation(conversation_id)
     except ConversationNotFoundError:
@@ -107,7 +124,7 @@ async def get_conversation(
     },
 )
 async def delete_conversation(
-    conversation_id: str,
+    conversation_id: Annotated[str, Path(description="Conversation ID (UUID format)")],
     storage: ConversationStorageService = Depends(  # noqa: B008
         get_conversation_storage_service
     ),
@@ -116,6 +133,7 @@ async def delete_conversation(
 
     Returns 204 No Content on success.
     """
+    _validate_uuid(conversation_id)
     try:
         await storage.delete_conversation(conversation_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
