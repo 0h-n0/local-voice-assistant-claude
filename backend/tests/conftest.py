@@ -1,11 +1,15 @@
 """Pytest configuration and fixtures for backend tests."""
 
+import io
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
+from scipy.io import wavfile
 
-from src.dependencies import set_stt_service
+from src.dependencies import set_stt_service, set_tts_service
 from src.services.stt_service import STTService
 
 
@@ -44,6 +48,86 @@ async def client(mock_stt_service):
         )
 
     mock_stt_service.transcribe = mock_transcribe
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        yield ac
+
+
+@pytest.fixture
+def mock_tts_service():
+    """Create a mock TTS service for testing."""
+    from src.models.tts import TTSHealthStatus, TTSStatus
+    from src.services.tts_service import TTSService
+
+    service = TTSService.__new__(TTSService)
+    service._model = MagicMock()
+    service._model_loaded = True
+    service._model_name = "test-model"
+    service._device = "cpu"
+    service._semaphore = None  # Will be set in __init__
+
+    # Mock validate_text method
+    def validate_text(text: str) -> str:
+        stripped = text.strip()
+        if not stripped:
+            raise ValueError("Text is empty or whitespace only")
+        if len(stripped) > 5000:
+            raise ValueError("Text is too long (max 5000 characters)")
+        return stripped
+
+    service.validate_text = validate_text
+
+    # Mock synthesize method
+    async def mock_synthesize(text: str, speed: float = 1.0) -> tuple[int, np.ndarray]:
+        service.validate_text(text)
+        # Generate a short sine wave as mock audio
+        sample_rate = 44100
+        duration = 0.1  # 100ms
+        t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float32)
+        audio = (np.sin(2 * np.pi * 440 * t) * 32767).astype(np.int16)
+        return sample_rate, audio
+
+    service.synthesize = mock_synthesize
+
+    # Mock get_status method
+    def get_status() -> TTSStatus:
+        return TTSStatus(
+            status=TTSHealthStatus.HEALTHY,
+            model_loaded=True,
+            model_name="test-model",
+            device="cpu",
+            last_check=datetime.now(UTC),
+            error_message=None,
+        )
+
+    service.get_status = get_status
+
+    # Mock audio_to_wav_bytes method
+    def audio_to_wav_bytes(sample_rate: int, audio: np.ndarray) -> bytes:
+        buffer = io.BytesIO()
+        wavfile.write(buffer, sample_rate, audio)
+        return buffer.getvalue()
+
+    service.audio_to_wav_bytes = audio_to_wav_bytes
+
+    # Mock get_audio_length_seconds method
+    def get_audio_length_seconds(sample_rate: int, audio: np.ndarray) -> float:
+        return len(audio) / sample_rate
+
+    service.get_audio_length_seconds = get_audio_length_seconds
+
+    return service
+
+
+@pytest.fixture
+async def tts_client(mock_tts_service):
+    """Create an async test client with mocked TTS service."""
+    from src.main import app
+
+    set_tts_service(mock_tts_service)
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

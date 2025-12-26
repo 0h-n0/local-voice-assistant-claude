@@ -14,6 +14,8 @@ dependencies = [
     "python-multipart>=0.0.6",
     "websockets>=12.0",
     "openai>=1.12.0",
+    "style-bert-vits2>=2.5.0",
+    "scipy>=1.10.0",
 ]
 
 [project.optional-dependencies]
@@ -82,7 +84,7 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["pydub.*", "soundfile.*", "reazonspeech.*", "openai.*"]
+module = ["pydub.*", "soundfile.*", "reazonspeech.*", "openai.*", "style_bert_vits2.*", "scipy.*", "scipy.io.*"]
 ignore_missing_imports = true
 
 [dependency-groups]

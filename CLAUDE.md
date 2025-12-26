@@ -7,6 +7,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-26
 - N/A (ステートレス処理、モデルはメモリに常駐) (002-stt-api)
 - Python 3.11+ + FastAPI, Pydantic v2, OpenAI Python SDK, httpx (async HTTP) (003-llm-text-service)
 - In-memory conversation cache (dict with TTL eviction) (003-llm-text-service)
+- Python 3.11+ (Backend) + FastAPI, Pydantic v2, Style-Bert-VITS2, torch, scipy (004-tts-api)
 
 - Python 3.11+ (Backend), TypeScript 5.x (Frontend)
 - FastAPI, Pydantic v2, uvicorn (Backend)
@@ -59,10 +60,10 @@ npm run lint     # Lint
 - TypeScript: Strict mode, prefer functional components
 
 ## Recent Changes
+- 004-tts-api: Added Python 3.11+ (Backend) + FastAPI, Pydantic v2, Style-Bert-VITS2, torch, scipy
 - 003-llm-text-service: Added Python 3.11+ + FastAPI, Pydantic v2, OpenAI Python SDK, httpx (async HTTP)
 - 002-stt-api: Added Python 3.11+ (Backend) + FastAPI, reazonspeech, NeMo, pydub (audio conversion), python-multipart (file upload)
 
-- 001-project-setup: Initial backend (FastAPI) and frontend (Next.js) foundation
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

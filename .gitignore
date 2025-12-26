@@ -55,3 +55,9 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+
+# TTS Model Assets (large files)
+backend/model_assets/**/*.safetensors
+backend/model_assets/**/*.npy
+backend/model_assets/**/config.json
+!backend/model_assets/.gitkeep
