@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-26
 - N/A（ステートレス処理、音声データは永続化しない） (005-voice-orchestrator)
 - Python 3.11+ + FastAPI, Pydantic v2, aiosqlite（非同期SQLiteアクセス） (006-conversation-storage)
 - SQLite（ローカルファイルシステム） (006-conversation-storage)
+- TypeScript 5.x (Frontend), Python 3.11+ (Backend - existing) + Next.js 16+, React 19+, Tailwind CSS (styling) (007-voice-chat-ui)
+- SQLite via existing conversation storage API (Feature 006) (007-voice-chat-ui)
 
 - Python 3.11+ (Backend), TypeScript 5.x (Frontend)
 - FastAPI, Pydantic v2, uvicorn (Backend)
@@ -64,9 +66,9 @@ npm run lint     # Lint
 - TypeScript: Strict mode, prefer functional components
 
 ## Recent Changes
+- 007-voice-chat-ui: Added TypeScript 5.x (Frontend), Python 3.11+ (Backend - existing) + Next.js 16+, React 19+, Tailwind CSS (styling)
 - 006-conversation-storage: Added Python 3.11+ + FastAPI, Pydantic v2, aiosqlite（非同期SQLiteアクセス）
 - 005-voice-orchestrator: Added Python 3.11+ (Backend) + FastAPI, Pydantic v2, httpx (内部サービス呼び出し用)
-- 004-tts-api: Added Python 3.11+ (Backend) + FastAPI, Pydantic v2, Style-Bert-VITS2, torch, scipy
 
 
 <!-- MANUAL ADDITIONS START -->
