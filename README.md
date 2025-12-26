@@ -19,40 +19,52 @@ local-voice-assistant-claude/
 - Python 3.11+
 - Node.js 18+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
+- GNU Make
 
-### Backend Setup
+### One-Command Setup
 
+```bash
+# Install all dependencies
+make install
+
+# Start all services (backend + frontend)
+make dev
+```
+
+This starts:
+- **Backend**: http://localhost:8000 (FastAPI with hot reload)
+- **Frontend**: http://localhost:3000 (Next.js dev server)
+
+Press `Ctrl+C` to stop all services.
+
+### Available Make Commands
+
+```bash
+make help       # Show all available commands
+make dev        # Start all services with hot reload
+make backend    # Start backend only
+make frontend   # Start frontend only
+make down       # Stop all running services
+make install    # Install all dependencies
+make check-deps # Verify required tools are installed
+make clean      # Stop services and clean temp files
+```
+
+### Manual Setup (Alternative)
+
+If you prefer to run services separately:
+
+**Backend:**
 ```bash
 cd backend
 uv sync
 uv run uvicorn src.main:app --reload
 ```
 
-The backend will be available at http://localhost:8000
-
-### Frontend Setup
-
+**Frontend:**
 ```bash
 cd frontend
 npm install
-npm run dev
-```
-
-The frontend will be available at http://localhost:3000
-
-### Running Both Services
-
-Open two terminal windows:
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
-uv run uvicorn src.main:app --reload
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
 npm run dev
 ```
 

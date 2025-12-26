@@ -18,6 +18,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-26
 - N/A (ステートレス WebSocket 接続、セッション状態はメモリに保持) (008-realtime-websocket)
 - Python 3.11+ (Backend), TypeScript 5.x (Frontend) + FastAPI, Pydantic v2, pydantic-settings, Next.js (009-config-management)
 - N/A（設定は `.env` ファイルと環境変数から読み込み、永続化なし） (009-config-management)
+- Makefile (GNU Make 4.x), Bash scripts + uv (Python), npm (Node.js), GNU Make (010-local-dev-setup)
 
 - Python 3.11+ (Backend), TypeScript 5.x (Frontend)
 - FastAPI, Pydantic v2, uvicorn (Backend)
@@ -70,9 +71,9 @@ npm run lint     # Lint
 - TypeScript: Strict mode, prefer functional components
 
 ## Recent Changes
+- 010-local-dev-setup: Added Makefile (GNU Make 4.x), Bash scripts + uv (Python), npm (Node.js), GNU Make
 - 009-config-management: Added Python 3.11+ (Backend), TypeScript 5.x (Frontend) + FastAPI, Pydantic v2, pydantic-settings, Next.js
 - 008-realtime-websocket: Added TypeScript 5.x (Frontend), Python 3.11+ (Backend)
-- 007-voice-chat-ui: Added TypeScript 5.x (Frontend), Python 3.11+ (Backend - existing) + Next.js 16+, React 19+, Tailwind CSS (styling)
 
 
 <!-- MANUAL ADDITIONS START -->
