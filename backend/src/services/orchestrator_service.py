@@ -13,6 +13,8 @@ from src.config import (
     ORCHESTRATOR_MAX_AUDIO_DURATION,
     ORCHESTRATOR_MAX_CONCURRENT,
     ORCHESTRATOR_MIN_AUDIO_DURATION,
+    ORCHESTRATOR_SEMAPHORE_TIMEOUT,
+    ORCHESTRATOR_TIMEOUT,
 )
 from src.models.orchestrator import (
     HealthStatus,
@@ -156,7 +158,7 @@ class OrchestratorService:
         conversation_id = str(uuid.uuid4())
 
         # Validate format
-        is_valid, error = self.validate_audio_format(filename, audio_data)
+        is_valid, _ = self.validate_audio_format(filename, audio_data)
         if not is_valid:
             supported = ", ".join(sorted(f[1:].upper() for f in SUPPORTED_FORMATS))
             raise OrchestratorError(
@@ -185,7 +187,7 @@ class OrchestratorService:
 
         # Acquire semaphore for concurrency control
         try:
-            async with asyncio.timeout(0.1):
+            async with asyncio.timeout(ORCHESTRATOR_SEMAPHORE_TIMEOUT):
                 await self._semaphore.acquire()
         except TimeoutError:
             raise OrchestratorError(
@@ -194,130 +196,170 @@ class OrchestratorService:
                 retry_after=5,
             ) from None
 
+        # Execute pipeline with overall timeout
         try:
-            # Step 1: STT
-            stt_start = time.time()
-            try:
-                stt_result = await self._stt.transcribe(audio_data, filename)
-            except Exception as e:
-                logger.exception("STT processing failed")
-                raise OrchestratorError(
-                    error_code=OrchestratorErrorCode.STT_SERVICE_UNAVAILABLE,
-                    message=f"Speech recognition failed: {e}",
-                ) from e
-            stt_time = time.time() - stt_start
-
-            # Validate transcription result
-            recognized_text = stt_result.text.strip()
-            if not recognized_text:
-                raise OrchestratorError(
-                    error_code=OrchestratorErrorCode.SPEECH_RECOGNITION_FAILED,
-                    message="Could not recognize speech in the audio",
-                )
-
-            # Validate audio duration
-            self._validate_audio_duration(stt_result.duration_seconds)
-
-            logger.info(
-                "STT completed",
-                extra={
-                    "text_length": len(recognized_text),
-                    "duration": stt_result.duration_seconds,
-                    "processing_time": stt_time,
-                },
-            )
-
-            # Step 2: LLM
-            llm_start = time.time()
-            try:
-                response_text, _ = await self._llm.generate_response(
-                    message=recognized_text,
+            return await asyncio.wait_for(
+                self._execute_pipeline(
+                    audio_data=audio_data,
+                    filename=filename,
+                    speed=speed,
+                    start_time=start_time,
                     conversation_id=conversation_id,
-                )
-            except RuntimeError as e:
-                error_msg = str(e)
-                if "LLM_RATE_LIMITED" in error_msg:
-                    raise OrchestratorError(
-                        error_code=OrchestratorErrorCode.LLM_RATE_LIMITED,
-                        message="LLM API rate limit exceeded",
-                        retry_after=60,
-                    ) from e
-                if "LLM_CONNECTION_ERROR" in error_msg:
-                    raise OrchestratorError(
-                        error_code=OrchestratorErrorCode.LLM_CONNECTION_ERROR,
-                        message="LLM API connection failed",
-                    ) from e
-                raise OrchestratorError(
-                    error_code=OrchestratorErrorCode.LLM_SERVICE_UNAVAILABLE,
-                    message=f"LLM processing failed: {e}",
-                ) from e
-            llm_time = time.time() - llm_start
-
-            logger.info(
-                "LLM completed",
-                extra={
-                    "input_length": len(recognized_text),
-                    "output_length": len(response_text),
-                    "processing_time": llm_time,
-                },
+                ),
+                timeout=ORCHESTRATOR_TIMEOUT,
             )
-
-            # Step 3: TTS
-            tts_start = time.time()
-            try:
-                sample_rate, audio = await self._tts.synthesize(response_text, speed)
-            except ValueError as e:
-                raise OrchestratorError(
-                    error_code=OrchestratorErrorCode.SYNTHESIS_FAILED,
-                    message=f"Speech synthesis failed: {e}",
-                ) from e
-            except Exception as e:
-                logger.exception("TTS processing failed")
-                raise OrchestratorError(
-                    error_code=OrchestratorErrorCode.TTS_SERVICE_UNAVAILABLE,
-                    message=f"TTS processing failed: {e}",
-                ) from e
-            tts_time = time.time() - tts_start
-
-            # Convert to WAV bytes
-            wav_bytes = self._tts.audio_to_wav_bytes(sample_rate, audio)
-            output_duration = self._tts.get_audio_length_seconds(sample_rate, audio)
-
-            logger.info(
-                "TTS completed",
-                extra={
-                    "text_length": len(response_text),
-                    "audio_duration": output_duration,
-                    "processing_time": tts_time,
-                },
-            )
-
-            total_time = time.time() - start_time
-
-            metadata = ProcessingMetadata(
-                total_time=total_time,
-                stt_time=stt_time,
-                llm_time=llm_time,
-                tts_time=tts_time,
-                input_duration=stt_result.duration_seconds,
-                input_text_length=len(recognized_text),
-                output_text_length=len(response_text),
-                output_duration=output_duration,
-                sample_rate=sample_rate,
-            )
-
-            logger.info(
-                "Voice dialogue completed",
-                extra={
-                    "total_time": total_time,
-                    "conversation_id": conversation_id,
-                },
-            )
-
-            return wav_bytes, metadata
-
+        except TimeoutError:
+            timeout_secs = int(ORCHESTRATOR_TIMEOUT)
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.PROCESSING_TIMEOUT,
+                message=f"Processing exceeded {timeout_secs} second timeout",
+            ) from None
         finally:
             self._semaphore.release()
+
+    async def _execute_pipeline(
+        self,
+        audio_data: bytes,
+        filename: str,
+        speed: float,
+        start_time: float,
+        conversation_id: str,
+    ) -> tuple[bytes, ProcessingMetadata]:
+        """Execute the STT → LLM → TTS pipeline.
+
+        Args:
+            audio_data: Raw audio file bytes
+            filename: Original filename for format detection
+            speed: TTS speech speed (0.5-2.0)
+            start_time: Pipeline start timestamp
+            conversation_id: Unique conversation ID
+
+        Returns:
+            Tuple of (WAV audio bytes, processing metadata)
+
+        Raises:
+            OrchestratorError: On any processing error
+        """
+        # Step 1: STT
+        stt_start = time.time()
+        try:
+            stt_result = await self._stt.transcribe(audio_data, filename)
+        except Exception as e:
+            logger.exception("STT processing failed")
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.STT_SERVICE_UNAVAILABLE,
+                message=f"Speech recognition failed: {e}",
+            ) from e
+        stt_time = time.time() - stt_start
+
+        # Validate transcription result
+        recognized_text = stt_result.text.strip()
+        if not recognized_text:
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.SPEECH_RECOGNITION_FAILED,
+                message="Could not recognize speech in the audio",
+            )
+
+        # Validate audio duration
+        self._validate_audio_duration(stt_result.duration_seconds)
+
+        logger.info(
+            "STT completed",
+            extra={
+                "text_length": len(recognized_text),
+                "duration": stt_result.duration_seconds,
+                "processing_time": stt_time,
+            },
+        )
+
+        # Step 2: LLM
+        llm_start = time.time()
+        try:
+            response_text, _ = await self._llm.generate_response(
+                message=recognized_text,
+                conversation_id=conversation_id,
+            )
+        except RuntimeError as e:
+            error_msg = str(e)
+            if "LLM_RATE_LIMITED" in error_msg:
+                raise OrchestratorError(
+                    error_code=OrchestratorErrorCode.LLM_RATE_LIMITED,
+                    message="LLM API rate limit exceeded",
+                    retry_after=60,
+                ) from e
+            if "LLM_CONNECTION_ERROR" in error_msg:
+                raise OrchestratorError(
+                    error_code=OrchestratorErrorCode.LLM_CONNECTION_ERROR,
+                    message="LLM API connection failed",
+                ) from e
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.LLM_SERVICE_UNAVAILABLE,
+                message=f"LLM processing failed: {e}",
+            ) from e
+        llm_time = time.time() - llm_start
+
+        logger.info(
+            "LLM completed",
+            extra={
+                "input_length": len(recognized_text),
+                "output_length": len(response_text),
+                "processing_time": llm_time,
+            },
+        )
+
+        # Step 3: TTS
+        tts_start = time.time()
+        try:
+            sample_rate, audio = await self._tts.synthesize(response_text, speed)
+        except ValueError as e:
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.SYNTHESIS_FAILED,
+                message=f"Speech synthesis failed: {e}",
+            ) from e
+        except Exception as e:
+            logger.exception("TTS processing failed")
+            raise OrchestratorError(
+                error_code=OrchestratorErrorCode.TTS_SERVICE_UNAVAILABLE,
+                message=f"TTS processing failed: {e}",
+            ) from e
+        tts_time = time.time() - tts_start
+
+        # Convert to WAV bytes
+        wav_bytes = self._tts.audio_to_wav_bytes(sample_rate, audio)
+        output_duration = self._tts.get_audio_length_seconds(sample_rate, audio)
+
+        logger.info(
+            "TTS completed",
+            extra={
+                "text_length": len(response_text),
+                "audio_duration": output_duration,
+                "processing_time": tts_time,
+            },
+        )
+
+        total_time = time.time() - start_time
+
+        metadata = ProcessingMetadata(
+            total_time=total_time,
+            stt_time=stt_time,
+            llm_time=llm_time,
+            tts_time=tts_time,
+            input_duration=stt_result.duration_seconds,
+            input_text_length=len(recognized_text),
+            output_text_length=len(response_text),
+            output_duration=output_duration,
+            sample_rate=sample_rate,
+        )
+
+        logger.info(
+            "Voice dialogue completed",
+            extra={
+                "total_time": total_time,
+                "conversation_id": conversation_id,
+            },
+        )
+
+        return wav_bytes, metadata
 
     def get_status(self) -> OrchestratorStatus:
         """Get orchestrator and service status.
