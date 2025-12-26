@@ -1,0 +1,314 @@
+openapi: 3.1.0
+info:
+  title: LLM Text Response Service API
+  description: |
+    API for generating text responses using Large Language Models.
+    Part of the Local Voice Assistant backend.
+  version: 1.0.0
+  contact:
+    name: Local Voice Assistant
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/llm/chat:
+    post:
+      summary: Generate LLM Response
+      description: |
+        Send a text message and receive an LLM-generated response.
+        Conversation context is maintained via conversation_id.
+      operationId: chat
+      tags:
+        - LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LLMRequest'
+            examples:
+              simple_greeting:
+                summary: Simple greeting
+                value:
+                  message: "こんにちは"
+                  conversation_id: "conv-12345"
+              weather_question:
+                summary: Weather question
+                value:
+                  message: "今日の天気は？"
+                  conversation_id: "conv-12345"
+      responses:
+        '200':
+          description: Successfully generated response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMResponse'
+              example:
+                text: "こんにちは！何かお手伝いできることはありますか？"
+                conversation_id: "conv-12345"
+                usage:
+                  prompt_tokens: 150
+                  completion_tokens: 25
+                  total_tokens: 175
+                processing_time_seconds: 1.23
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_message:
+                  summary: Empty message
+                  value:
+                    error_code: "EMPTY_MESSAGE"
+                    message: "Message content is empty or whitespace"
+                message_too_long:
+                  summary: Message too long
+                  value:
+                    error_code: "MESSAGE_TOO_LONG"
+                    message: "Message exceeds 4000 character limit"
+                    details:
+                      max_length: 4000
+                      provided_length: 5000
+                invalid_id:
+                  summary: Invalid conversation ID
+                  value:
+                    error_code: "INVALID_CONVERSATION_ID"
+                    message: "Conversation ID must be alphanumeric with hyphens/underscores (max 64 chars)"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "LLM_PROCESSING_ERROR"
+                message: "Failed to generate response"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                not_configured:
+                  summary: API not configured
+                  value:
+                    error_code: "LLM_NOT_CONFIGURED"
+                    message: "OpenAI API key is not configured"
+                rate_limited:
+                  summary: Rate limited
+                  value:
+                    error_code: "LLM_RATE_LIMITED"
+                    message: "Rate limited by OpenAI API, please try again later"
+
+  /api/llm/conversations/{conversation_id}:
+    delete:
+      summary: Clear Conversation
+      description: |
+        Clear the conversation history for a specific conversation ID.
+        Returns success even if the conversation doesn't exist.
+      operationId: clearConversation
+      tags:
+        - LLM
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: The conversation ID to clear
+      responses:
+        '200':
+          description: Conversation cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Conversation cleared"
+                  conversation_id:
+                    type: string
+                    example: "conv-12345"
+        '400':
+          description: Invalid conversation ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/llm/status:
+    get:
+      summary: Get Service Status
+      description: |
+        Check the health status of the LLM service.
+        Returns configuration state and active conversation count.
+      operationId: getStatus
+      tags:
+        - LLM
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMStatus'
+              examples:
+                healthy:
+                  summary: Healthy service
+                  value:
+                    status: "healthy"
+                    model: "gpt-4o-mini"
+                    api_configured: true
+                    active_conversations: 5
+                    last_check: "2025-12-26T10:30:00Z"
+                unhealthy:
+                  summary: Unhealthy service
+                  value:
+                    status: "unhealthy"
+                    model: "gpt-4o-mini"
+                    api_configured: false
+                    active_conversations: 0
+                    error_message: "OPENAI_API_KEY environment variable not set"
+
+components:
+  schemas:
+    LLMRequest:
+      type: object
+      required:
+        - message
+        - conversation_id
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: User's input text message
+          example: "今日の天気は？"
+        conversation_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[a-zA-Z0-9_-]+$'
+          description: Client-generated conversation ID for context
+          example: "conv-12345"
+
+    LLMResponse:
+      type: object
+      required:
+        - text
+        - conversation_id
+        - processing_time_seconds
+      properties:
+        text:
+          type: string
+          description: Generated response text
+          example: "申し訳ありませんが、私はリアルタイムの天気情報にアクセスできません。お住まいの地域の天気予報サービスをご確認ください。"
+        conversation_id:
+          type: string
+          description: Echo of the request conversation ID
+          example: "conv-12345"
+        usage:
+          $ref: '#/components/schemas/TokenUsage'
+        processing_time_seconds:
+          type: number
+          format: float
+          minimum: 0
+          description: Total processing time in seconds
+          example: 1.23
+
+    TokenUsage:
+      type: object
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+      properties:
+        prompt_tokens:
+          type: integer
+          minimum: 0
+          description: Number of tokens in the prompt (including history)
+          example: 150
+        completion_tokens:
+          type: integer
+          minimum: 0
+          description: Number of tokens in the response
+          example: 25
+        total_tokens:
+          type: integer
+          minimum: 0
+          description: Total tokens used (prompt + completion)
+          example: 175
+
+    LLMStatus:
+      type: object
+      required:
+        - status
+        - model
+        - api_configured
+        - active_conversations
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Overall service health status
+        model:
+          type: string
+          description: Configured LLM model name
+          example: "gpt-4o-mini"
+        api_configured:
+          type: boolean
+          description: Whether the API key is configured
+        active_conversations:
+          type: integer
+          minimum: 0
+          description: Number of active conversations in cache
+        last_check:
+          type: string
+          format: date-time
+          description: Timestamp of last health check
+        error_message:
+          type: string
+          description: Error details if status is not healthy
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          enum:
+            - EMPTY_MESSAGE
+            - MESSAGE_TOO_LONG
+            - INVALID_CONVERSATION_ID
+            - LLM_NOT_CONFIGURED
+            - LLM_RATE_LIMITED
+            - LLM_CONNECTION_ERROR
+            - LLM_API_ERROR
+            - LLM_PROCESSING_ERROR
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error context
+
+tags:
+  - name: LLM
+    description: LLM text generation endpoints
