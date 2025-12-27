@@ -100,7 +100,7 @@ class StorageSettings(BaseSettings):
 class DeepgramSettings(BaseSettings):
     """Deepgram STT configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="DEEPGRAM_")
+    model_config = SettingsConfigDict(env_prefix="DEEPGRAM_", env_file=".env", extra="ignore")
 
     api_key: SecretStr = Field(default=SecretStr(""), description="Deepgram API Key")
     model: str = Field(default="nova-2", description="STT model name")
@@ -111,7 +111,7 @@ class DeepgramSettings(BaseSettings):
 class OpenAISettings(BaseSettings):
     """OpenAI LLM configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="OPENAI_")
+    model_config = SettingsConfigDict(env_prefix="OPENAI_", env_file=".env", extra="ignore")
 
     api_key: SecretStr = Field(default=SecretStr(""), description="OpenAI API Key")
     model: str = Field(default="gpt-4o-mini", description="LLM model name")

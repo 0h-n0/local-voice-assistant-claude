@@ -15,7 +15,7 @@ from src.models.stt import Segment, STTStatus, TranscriptionResponse
 logger = logging.getLogger(__name__)
 
 # Supported audio formats
-SUPPORTED_FORMATS = {".wav", ".mp3", ".flac", ".ogg"}
+SUPPORTED_FORMATS = {".wav", ".mp3", ".flac", ".ogg", ".webm", ".mp4", ".m4a"}
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
 TARGET_SAMPLE_RATE = 16000
 BYTES_PER_SAMPLE = 2  # 16-bit audio
@@ -188,8 +188,8 @@ class STTService:
             segments = [
                 Segment(
                     text=seg.text,
-                    start_time=seg.start_time,
-                    end_time=seg.end_time,
+                    start_time=seg.start_seconds,
+                    end_time=seg.end_seconds,
                 )
                 for seg in result.segments
             ]
