@@ -2,6 +2,9 @@
 # ============================================
 # Single command to start all services for local development
 
+# Use bash for trap support
+SHELL := /bin/bash
+
 .PHONY: help dev backend frontend down install check-deps clean
 
 # Default target

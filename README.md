@@ -16,7 +16,7 @@ local-voice-assistant-claude/
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11 or 3.12 (Python 3.13+ is not currently supported due to dependency constraints)
 - Node.js 18+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - GNU Make
@@ -116,7 +116,7 @@ npm run build
 
 ### Backend
 - FastAPI
-- Python 3.11+
+- Python 3.11-3.12
 - Pydantic v2
 - uv (package manager)
 - ruff (linter/formatter)
